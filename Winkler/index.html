@@ -1,0 +1,426 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0C5F45"><link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Cockpit"><title>Makler-Cockpit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style id="appcss">
+:root{
+  --bg:#F5F0E6; --surface:#FFFDF8; --ink:#28221A; --muted:#84796A;
+  --accent:#0C5F45; --accent-ink:#0A503A; --accent-soft:#E3EDE3;
+  --line:#E7DECC;
+  --a-bg:#DFEDE2; --a-ink:#14603F;
+  --b-bg:#F4E7CB; --b-ink:#8A5E14;
+  --c-bg:#ECE6D9; --c-ink:#6E6558;
+  --grid:#ECE4D3;
+  --shadow:0 1px 2px rgba(70,55,30,.05),0 14px 34px -24px rgba(70,55,30,.28);
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:15.5px; line-height:1.6}
+#app{max-width:1000px; margin:0 auto; padding:30px 20px 76px}
+h1{font-family:"Bricolage Grotesque",sans-serif; font-size:1.65rem; font-weight:700; margin:0; letter-spacing:-.01em}
+h2{font-family:"Bricolage Grotesque",sans-serif; font-size:1.05rem; font-weight:600; margin:0 0 14px}
+button{font:inherit; cursor:pointer}
+input{font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:9px 12px; width:100%}
+input:focus,button:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.statusline{background:var(--accent-soft); color:var(--accent-ink); border-radius:12px; padding:10px 16px; font-size:.86rem; margin:16px 0 22px; display:flex; gap:18px; flex-wrap:wrap}
+.statusline b{font-weight:600}
+.top{display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap}
+.top .sub{color:var(--muted); font-size:.87rem}
+.savechip{font-size:.74rem; color:var(--muted)}
+.chips{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 10px}
+.chips.second{margin-bottom:24px}
+.chiplabel{font-size:.72rem; color:var(--muted); align-self:center; margin-right:2px; letter-spacing:.06em; text-transform:uppercase}
+.chip{border:1px solid var(--line); background:var(--surface); border-radius:99px; padding:7px 16px; font-size:.86rem; font-weight:500; cursor:pointer; color:var(--muted)}
+.chip.on{background:var(--accent); border-color:var(--accent); color:#FFFDF8}
+.chip .cnt{font-family:"IBM Plex Mono",monospace; font-size:.74rem; opacity:.75; margin-left:4px}
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:30px}
+.kpi{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 18px; box-shadow:var(--shadow)}
+.kpi .v{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; font-size:1.6rem; font-weight:500}
+.kpi .l{font-size:.78rem; color:var(--muted); margin-top:3px}
+.kpi.a .v{color:var(--a-ink)} .kpi.b .v{color:var(--b-ink)} .kpi.c .v{color:var(--c-ink)}
+.grid2{display:grid; grid-template-columns:1.2fr .8fr; gap:18px; margin-bottom:30px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px 22px; box-shadow:var(--shadow)}
+.card .chnote{font-size:.78rem; color:var(--muted); margin-top:10px}
+svg text{font-family:"IBM Plex Mono",monospace; font-size:10px; fill:var(--muted)}
+.pill{display:inline-block; font-size:.68rem; font-weight:700; padding:3px 10px; border-radius:99px; letter-spacing:.04em; white-space:nowrap}
+.pill.A{background:var(--a-bg); color:var(--a-ink)}
+.pill.B{background:var(--b-bg); color:var(--b-ink)}
+.pill.C{background:var(--c-bg); color:var(--c-ink)}
+.real{display:inline-block; font-size:.66rem; font-weight:600; padding:2px 9px; border-radius:99px; background:var(--accent-soft); color:var(--accent-ink); margin-left:6px; white-space:nowrap}
+.inbox .row{border-bottom:1px solid var(--line); padding:14px 6px; cursor:pointer; border-radius:10px}
+.inbox .row:hover{background:var(--bg)}
+.inbox .row:last-child{border-bottom:none}
+.inbox .head{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.inbox .who{font-weight:600}
+.inbox .obj{font-size:.76rem; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:2px 8px}
+.inbox .ts{font-family:"IBM Plex Mono",monospace; font-size:.74rem; color:var(--muted); margin-left:auto}
+.inbox .prev{color:var(--muted); font-size:.87rem; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.detail{display:none; margin-top:14px; border-top:1px dashed var(--line); padding-top:14px}
+.row.open .detail{display:block}
+.row.open .prev{white-space:normal}
+.facts{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px}
+.fact{font-size:.76rem; background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:3px 9px}
+.fact b{font-weight:600}
+.why{font-size:.82rem; color:var(--muted); margin-bottom:12px}
+.draft{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:14px 16px; font-size:.9rem; white-space:pre-wrap}
+.draft-h{display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; gap:8px; flex-wrap:wrap}
+.draft-h .t{font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; font-weight:700; color:var(--accent-ink)}
+.btn{border:1px solid var(--line); background:var(--surface); border-radius:9px; padding:6px 14px; font-size:.82rem; color:var(--ink); font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:#FFFDF8}
+.btn.small{padding:4px 11px; font-size:.76rem}
+/* Objekte */
+.objgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px}
+.objcard{border:1px solid var(--line); border-radius:13px; padding:14px 16px; background:var(--bg)}
+.objcard.off{opacity:.62}
+.objcard .n{font-weight:600}
+.objcard .m{font-size:.8rem; color:var(--muted); margin:2px 0 10px}
+.badge{display:inline-block; font-size:.68rem; font-weight:600; padding:2px 9px; border-radius:99px; background:var(--a-bg); color:var(--a-ink)}
+.badge.off{background:var(--c-bg); color:var(--c-ink)}
+.objform{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px}
+.objform .full{grid-column:1/-1}
+.objform label{font-size:.74rem; color:var(--muted); display:block; margin-bottom:3px}
+.objform textarea{font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:9px 12px; width:100%; min-height:70px; resize:vertical}
+.objform select{font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:9px 12px; width:100%}
+@media(max-width:640px){.objform{grid-template-columns:1fr}}
+.limitnote{font-size:.78rem; color:var(--muted); margin-top:10px}
+.kpi.t .v{color:var(--accent-ink)}
+.senthint{font-size:.78rem; color:var(--accent-ink); margin-top:8px}
+.termhint{font-size:.78rem; color:var(--b-ink); margin-top:8px}
+footer{margin-top:38px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:.79rem}
+/* Login */
+.gate{min-height:82vh; display:flex; align-items:center; justify-content:center}
+.gatecard{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:38px 34px; max-width:380px; width:100%; box-shadow:var(--shadow); text-align:center}
+.gatecard h1{font-size:1.4rem}
+.gatecard .s{color:var(--muted); font-size:.88rem; margin:8px 0 22px}
+.gatecard .err{color:#9C3A34; font-size:.82rem; margin-top:10px; min-height:1.2em}
+.gatecard button{width:100%; margin-top:12px; padding:11px}
+.gatefoot{margin-top:18px; font-size:.74rem; color:var(--muted)}
+</style></head><body><div id="app"></div>
+<script type="application/json" id="state">
+{"savedAt":1788455759391,"settings":{"code":"rothenbaum","limit":3,"brand":"Anfragen-Assistent","kunde":"Frau Winkler","minProAnfrage":3},
+"objekte":[{"id":"o1","name":"Privatstrasse Am Rothenbaum · 2-Zi möbliert","miete":1500,"moebl":"möbliert","ab":"","dauer":"min. 12 Monate","refImmowelt":"3513-03","refScout":"170398081","krit":"Vollständige Unterlagen, tragfähiges Einkommen, Einzug zeitnah, max. 2 Personen","status":"aktiv"},{"id":"omtizl19pha9","name":"hkduhfwhefu","miete":2000,"status":"vermietet"}],
+"anfragen":[
+{"id":1,"obj":"o1","ts":"2026-08-31T10:50","name":"Interessent H. M.","kurz":"Privatier, 41","typ":"leer","stufe":"B","astatus":"bereit","dauer":"k. A.","einzug":"sofort","unterlagen":"keine beigefügt","why":"Hohes angegebenes Einkommen (6–7 T€), aber keinerlei Nachweise — vor Einladung Unterlagen anfordern.","text":"Guten Tag, gern würde ich die angebotene Wohnung besichtigen. Ich bin 41 Jahre, alleinstehend, kinderlos, Privatier und verfüge über entsprechendes Kapitalvermögen. Gern können Sie mich per E-Mail oder auf dem Handy erreichen. — Einpersonenhaushalt · 6.000–7.000 € · Einzug: sofort","entwurf":"Sehr geehrter Herr M.,\nherzlichen Dank für Ihre Anfrage zur „Privatstrasse Am Rothenbaum“. Ihr Profil klingt passend. Für die Vorauswahl benötige ich noch einen Einkommens- bzw. Vermögensnachweis und eine aktuelle Schufa-Auskunft — senden Sie mir diese gern per E-Mail. Danach melde ich mich umgehend mit einem Besichtigungstermin.\nGrüße, Anett Winkler"},
+{"id":2,"obj":"o1","ts":"2026-08-31","name":"Interessent K. G.","kurz":"Jurastudent, Bürgschaft Eltern","typ":"leer","stufe":"B","astatus":"bereit","dauer":"ab Oktober","einzug":"flexibel","unterlagen":"keine beigefügt","why":"Student mit angebotener Elternbürgschaft — tragfähig, aber erst mit Bürgschaftserklärung und Nachweisen der Bürgen.","text":"Guten Tag, ich beginne Anfang Oktober mein Jurastudium in Hamburg. Meine Eltern sind selbstständig und würden mich finanziell unterstützen bzw. als Bürgen zur Verfügung stehen. Wäre eine Besichtigung möglich? Falls Sie vorab Unterlagen benötigen, teilen Sie mir diese gerne mit. — 6.000–7.000 € (Eltern) · Einzug: flexibel","entwurf":"Sehr geehrter Herr G.,\nvielen Dank für Ihre freundliche Anfrage zur „Privatstrasse Am Rothenbaum“. Gern berücksichtige ich Sie: Bitte senden Sie mir vorab die Bürgschaftserklärung Ihrer Eltern samt Einkommensnachweisen sowie eine aktuelle Schufa-Auskunft. Sobald die Unterlagen vorliegen, vereinbaren wir zeitnah eine Besichtigung.\nGrüße, Anett Winkler"},
+{"id":3,"obj":"o1","ts":"2026-08-31","name":"Interessenten T. & B. T.","kurz":"Ehepaar aus Los Angeles","typ":"teilweise","stufe":"B","astatus":"bereit","dauer":"mehrjährig möglich","einzug":"k. A.","unterlagen":"Bonität, Einkommensnachweis, Mietzahlungsbestätigung (angekündigt)","why":"Referenzen und Rücklagen vorhanden, aber ersparnisfinanziert (3–4 T€) — Nachweise vor Einladung prüfen.","text":"Hallo! Wir sind Trevor und Bethany, ein Ehepaar frisch aus LA (10+ Jahre Filmbranche). Wir leben von soliden Ersparnissen, Trevor studiert Maschinenbau, Bethany sucht Agenturen. SCHUFA, Banknachweise, US-Bonitätsgutachten und Empfehlungsschreiben können wir vorlegen. Wir sprechen noch nicht fließend Deutsch, lernen aber fleißig. — 2 Erwachsene · 3.000–4.000 € · tierfrei","entwurf":"Sehr geehrte Frau T., sehr geehrter Herr T.,\nherzlichen Dank für Ihre ausführliche Vorstellung — Ihre Referenzen klingen sehr ordentlich. Bitte senden Sie mir Ihre Bonitätsauskunft, die Banknachweise zu Ihren Rücklagen und das Empfehlungsschreiben per E-Mail; anschließend schlage ich Ihnen gern einen Besichtigungstermin vor.\nGladly also in English, if easier.\nGrüße, Anett Winkler"},
+{"id":4,"obj":"o1","ts":"2026-08-31","name":"Interessent F. R.","kurz":"Paar aus Hamburg, beide angestellt","typ":"teilweise","stufe":"A","astatus":"bereit","dauer":"flexibel","einzug":"flexibel","unterlagen":"Schufa und alle Unterlagen vorhanden (angekündigt)","why":"Beide außerhalb der Probezeit, 4–5 T€, Unterlagen komplett, flexibel — einladen.","text":"Hallo! Wir hätten sehr großes Interesse an der Wohnung! Wir sind ein Paar aus Hamburg, außerhalb der Probezeit, flexibel bei Einzugsdatum und Mietdauer. Schufa und alle weiteren Unterlagen sind vorhanden. — 2 Erwachsene · Angestellte · 4.000–5.000 € · Einzug: flexibel","entwurf":"Sehr geehrter Herr R.,\nherzlichen Dank für Ihre Anfrage und Ihr Interesse an der „Privatstrasse Am Rothenbaum“. Da Ihre Unterlagen vollständig vorliegen: Wenn Sie Zeit haben, können wir uns gerne am {TERMIN} dort treffen. Passt Ihnen das?\nFreue mich über Ihre Rückmeldung.\nGrüße, Anett Winkler"},
+{"id":5,"obj":"o1","ts":"2026-08-31","name":"Interessent P. R.","kurz":"Paar, Erzieher + Eventmanagement","typ":"leer","stufe":"C","astatus":"bereit","dauer":"k. A.","einzug":"so bald wie möglich","unterlagen":"keine beigefügt","why":"Nettoeinkommen 2–3 T€ bei 1.500 € Miete — Tragfähigkeit deutlich unter der üblichen Grenze.","text":"Moin, meine Freundin und ich haben großes Interesse und wohnen aktuell in einer WG auf St. Pauli. Wir möchten zusammenziehen, Ihre Wohnung wäre perfekt. Wir arbeiten beide Vollzeit, sie im Eventmanagement und ich als Erzieher. — 2 Erwachsene · Angestellte · 2.000–3.000 € · Einzug: so bald wie möglich","entwurf":"Lieber Herr R.,\nvielen Dank für Ihr Interesse an der „Privatstrasse Am Rothenbaum“. Leider kann ich Ihnen diese Wohnung nicht anbieten. Sollte ich eine ähnliche Immobilie mit passenderen Rahmenbedingungen in mein Angebot aufnehmen, hören Sie gerne von mir.\nViele Grüße, Anett Winkler"},
+{"id":6,"obj":"o1","ts":"2026-08-31","name":"Interessentin V. B.","kurz":"Ingenieurin, 30, aus Rotherbaum","typ":"leer","stufe":"B","astatus":"bereit","dauer":"langfristig gewünscht","einzug":"flexibel","unterlagen":"keine beigefügt","why":"Starkes Profil — aber Wunsch nach langfristigem Zuhause vs. möbliertes Objekt vorab klären.","text":"Hallo, ich bin 30, Ingenieurin mit fester Anstellung und wohne aktuell in Hamburg-Rotherbaum — mein Vermieter hat Eigenbedarf angemeldet. Ich suche ein langfristiges Zuhause und bin nahezu täglich für eine Besichtigung verfügbar. — Einpersonenhaushalt · Angestellte · 4.000–5.000 € · Einzug: flexibel","entwurf":"Sehr geehrte Frau B.,\nherzlichen Dank für Ihre Anfrage — Ihre Situation kann ich gut nachvollziehen. Ein Hinweis vorab: Die Wohnung wird möbliert vermietet; bitte prüfen Sie, ob das zu Ihren langfristigen Plänen passt. Wenn ja, senden Sie mir gern Gehaltsnachweise und eine aktuelle Schufa-Auskunft — dann lade ich Sie umgehend zur Besichtigung ein.\nGrüße, Anett Winkler"},
+{"id":7,"obj":"o1","ts":"2026-08-31","name":"Interessentin B. M.","kurz":"30, Beschäftigung „Sonstiges“","typ":"leer","stufe":"B","astatus":"bereit","dauer":"k. A.","einzug":"flexibel, spät. Jahresende","unterlagen":"keine beigefügt","why":"Berufliche Situation unklar, außergewöhnliche Bürgen-Angabe — Nachweise anfordern.","text":"Guten Tag Frau Winkler, die Wohnung entspricht genau meinen Vorstellungen. Ich bin 30 und lebe seit zweieinhalb Jahren in Hamburg, beim Einzug bin ich flexibel. Die finanzielle Absicherung ist gewährleistet; zudem kann ich einen äußerst solventen Bürgen vorweisen. — Einpersonenhaushalt · Sonstiges · 4.000–5.000 € · Einzug: flexibel","entwurf":"Sehr geehrte Frau M.,\nvielen Dank für Ihre Anfrage zur „Privatstrasse Am Rothenbaum“. Für die Vorauswahl benötige ich noch Angaben zu Ihrer beruflichen Situation sowie die üblichen Unterlagen: Einkommens- bzw. Bonitätsnachweis und ggf. die Bürgschaftserklärung. Senden Sie mir diese gern per E-Mail — dann melde ich mich umgehend.\nGrüße, Anett Winkler"},
+{"id":8,"obj":"o1","ts":"2026-08-31T13:45","name":"Interessentin K. L.","kurz":"Bewerbung über ImmoScout, Unterlagen per Mail","typ":"teilweise","stufe":"A","astatus":"bereit","dauer":"k. A.","einzug":"k. A.","unterlagen":"Bonitäts-Check beigefügt, weitere angeboten","why":"Ernsthafte Bewerberin mit Unterlagen — Portal-Problem ist kein Ausschlussgrund.","text":"Liebe Frau Winkler, gerne stelle ich Ihnen alle Unterlagen per Mail zur Verfügung, denn ich scheitere mit dem Hochladen auf Immobilienscout — die Verifizierungsnummer der Schufa-Auskunft passt z. B. nicht in das dafür vorgesehene Formular. Was bräuchten Sie noch vor einem Besichtigungstermin?","entwurf":"Sehr geehrte Frau L.,\nvielen Dank für Ihre Nachricht — das Hochladen im Portal macht öfter Schwierigkeiten, per E-Mail ist es völlig in Ordnung. Senden Sie mir gern Ihre Schufa-Auskunft und Einkommensnachweise direkt hierher. Für die Besichtigung: Passt Ihnen der Termin am {TERMIN}?\nFreue mich über Ihre Rückmeldung.\nGrüße, Anett Winkler"},
+{"id":9,"obj":"o1","ts":"2026-08-31","name":"Interessent V. M.","kurz":"Finanzbereich, vollständige Mappe","typ":"komplett","stufe":"A","astatus":"bereit","real":"Von Ihnen zur Besichtigung eingeladen","dauer":"ab Oktober, flexibel","einzug":"< 3 Monate","unterlagen":"Gehaltsnachweise, Schufa, Ausweis, Arbeitgeber-Nachweis","why":"Vollständige Mappe, nachgewiesen fortlaufendes Gehalt — klarer Einladungsfall. Deckt sich mit Ihrer Entscheidung.","text":"Sehr geehrte Frau Winkler, ich interessiere mich sehr für die möblierte 2-Zimmer-Wohnung in Rotherbaum. Beruflich komme ich aus dem Finanzbereich (Family Office), derzeit vertraglich vereinbarte Weiterbildungsphase (M.Sc. Finance, Lissabon), Arbeitsvertrag wird ab 01.11.2026 unbefristet fortgeführt — Nachweis beigefügt, ebenso Gehaltsnachweise, SCHUFA und Ausweiskopie. Einzug ab Oktober passend, beim Termin flexibel. — Einpersonenhaushalt · 3.000–4.000 € · < 3 Monate","entwurf":"Sehr geehrter Herr M.,\nherzlichen Dank für Ihre Anfrage und Ihr Interesse an der „Privatstrasse Am Rothenbaum“. Wenn Sie Zeit haben, können wir uns gerne am {TERMIN} dort treffen. Passt Ihnen das?\nFreue mich über Ihre Rückmeldung.\nGrüße, Anett Winkler"},
+{"id":10,"obj":"o1","ts":"2026-08-31","name":"Interessentin S. A.","kurz":"Mutter mit Tochter","typ":"leer","stufe":"C","astatus":"bereit","real":"Von Ihnen abgesagt (Warteliste)","dauer":"k. A.","einzug":"sofort","unterlagen":"keine beigefügt","why":"Bedarf passt nicht zum Zuschnitt des möblierten 2-Zi-Objekts. Deckt sich mit Ihrer Entscheidung.","text":"Hallo, diese Wohnung wäre perfekt für meine Tochter und mich! Wir würden uns sehr freuen, wenn wir diese besichtigen können. Nicht Raucher, keine Tiere, ordentlich und ruhig. — Familie · Angestellte · 4.000–5.000 € · Einzug: sofort","entwurf":"Liebe Frau A.,\nleider kann ich Ihnen diese Wohnung nicht anbieten. Sollte ich eine ähnliche Immobilie bald in meinem Angebot aufnehmen, hören Sie gerne von mir.\nViele Grüße, Anett Winkler"}
+]}
+</script>
+<script id="appcode">
+(function(){
+"use strict";
+var FONTLINK='<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">';
+var state=null, embeddedSavedAt=0, cap=null, capKnown=false, pubTimer=null, retried=false, saveMode="init";
+var ui={objF:"alle", stufeF:"alle", openId:null, authed:false, addObj:false, sentHint:null};
+
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function uid(){return "o"+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);}
+function objById(id){for(var i=0;i<state.objekte.length;i++) if(state.objekte[i].id===id) return state.objekte[i]; return null;}
+function draftOf(a){return a.entwurf.split("{TERMIN}").join("[TERMIN EINFÜGEN]");}
+function fmtTs(ts){
+  if(ts.indexOf("T")<0){var p=ts.split("-");return p[2]+"."+p[1]+".";}
+  var d=new Date(ts);return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+}
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function rows(){
+  return state.anfragen.filter(function(a){
+    var o=objById(a.obj);
+    var objOk = ui.objF==="alle" ? (o && o.status==="aktiv") : a.obj===ui.objF;
+    var stOk = ui.stufeF==="alle" || a.stufe===ui.stufeF;
+    return objOk && stOk && a.astatus==="bereit";
+  });
+}
+
+/* ---- Persistenz (Seite speichert sich selbst) ---- */
+function persistLocal(){try{localStorage.setItem("mc-state-winkler",JSON.stringify(state));}catch(e){}}
+function commit(){state.savedAt=Date.now(); persistLocal(); render(); schedulePublish();}
+function buildDoc(){
+  var css=document.getElementById("appcss").textContent;
+  var code=document.getElementById("appcode").textContent;
+  var json=JSON.stringify(state).replace(/</g,"\\u003c");
+  return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Makler-Cockpit</title>'
+    +FONTLINK+'<style id="appcss">'+css+'</style></head><body><div id="app"></div>'
+    +'<script type="application/json" id="state">'+json+'<\/script>'
+    +'<script id="appcode">'+code+'<\/script></body></html>';
+}
+function schedulePublish(){
+  if(!cap){ if(capKnown){saveMode="local"; updateChip();} return; }
+  saveMode="saving"; updateChip();
+  clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1600);
+}
+function doPublish(){
+  cap.publish(buildDoc()).then(function(){retried=false; saveMode="saved"; updateChip();}).catch(function(e){
+    var c=e&&e.code;
+    if(c==="conflict"){return;}
+    if(c==="rate_limited"){clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,5000); return;}
+    if(c==="upstream_error"&&!retried){retried=true; clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1500+Math.random()*1500); return;}
+    retried=false;
+    if(c==="not_granted"||c==="not_writer"||c==="not_declared"||c==="capability_disabled"||c==="capability_removed"){cap=null; saveMode="viewer";}
+    else{saveMode="local";}
+    updateChip();
+  });
+}
+function chipTxt(){
+  if(saveMode==="saving")return "Speichert…";
+  if(saveMode==="saved")return "Gespeichert";
+  if(saveMode==="viewer")return "Ansichtsmodus — Änderungen gehen an Ihren Assistenten";
+  if(saveMode==="local")return "Lokal gespeichert";
+  return "";
+}
+function updateChip(){var el=document.getElementById("savechip"); if(el) el.textContent=chipTxt();}
+
+/* ---- Charts ---- */
+function lineChart(){
+  var byDay={}; rows().forEach(function(a){var d=a.ts.slice(0,10); byDay[d]=(byDay[d]||0)+1;});
+  var days=Object.keys(byDay).sort();
+  if(!days.length) return "<p style='color:var(--muted);font-size:.85rem'>Noch keine Anfragen im Filter.</p>";
+  var W=520,H=170,P=28,max=Math.max.apply(null,days.map(function(d){return byDay[d];}));
+  var bw=Math.min(60,(W-2*P)/days.length*0.62);
+  var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto" role="img" aria-label="Anfragen pro Tag">';
+  [0.25,0.5,0.75,1].forEach(function(f){var y=H-P-(H-2*P)*f; s+='<line x1="'+P+'" y1="'+y+'" x2="'+(W-8)+'" y2="'+y+'" stroke="'+cssv("--grid")+'" stroke-width="1"/>';});
+  days.forEach(function(d,i){
+    var x=P+(W-2*P)*(days.length===1?0.5:(i+0.5)/days.length);
+    var h=(H-2*P)*(byDay[d]/max);
+    s+='<rect x="'+(x-bw/2)+'" y="'+(H-P-h)+'" width="'+bw+'" height="'+h+'" rx="4" fill="'+cssv("--accent")+'"/>';
+    s+='<text x="'+x+'" y="'+(H-P-h-6)+'" text-anchor="middle" style="font-weight:600; fill:'+cssv("--ink")+'">'+byDay[d]+'</text>';
+    s+='<text x="'+x+'" y="'+(H-8)+'" text-anchor="middle">'+d.slice(8,10)+"."+d.slice(5,7)+".</text>";
+  });
+  return s+"</svg>";
+}
+function typChart(){
+  var r=rows(), n=r.length||1;
+  var cats=[["komplett","Komplette Mappe","--a-ink"],["teilweise","Teilweise Unterlagen","--b-ink"],["leer","Ohne Unterlagen","--c-ink"]];
+  var html="";
+  cats.forEach(function(c){
+    var k=r.filter(function(a){return a.typ===c[0];}).length;
+    var pct=Math.round(k/n*100);
+    html+='<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px"><span>'+c[1]+'</span><span style="font-family:IBM Plex Mono,monospace;color:var(--muted)">'+k+' · '+pct+'&#8201;%</span></div>'
+      +'<div style="background:var(--grid);border-radius:6px;height:12px;overflow:hidden"><div style="width:'+pct+'%;height:100%;border-radius:6px;background:var('+c[2]+')"></div></div></div>';
+  });
+  return html;
+}
+function objChart(){
+  var act=state.objekte.filter(function(o){return o.status==="aktiv";});
+  if(!act.length) return "<p style='color:var(--muted);font-size:.85rem'>Keine aktiven Objekte.</p>";
+  var max=Math.max.apply(null,act.map(function(o){return state.anfragen.filter(function(a){return a.obj===o.id;}).length;}))||1;
+  var html="";
+  act.forEach(function(o){
+    var k=state.anfragen.filter(function(a){return a.obj===o.id;}).length;
+    var ak=state.anfragen.filter(function(a){return a.obj===o.id&&a.stufe==="A";}).length;
+    html+='<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px"><span>'+esc(o.name)+'</span><span style="font-family:IBM Plex Mono,monospace;color:var(--muted)">'+k+' Anfragen · '+ak+'× A</span></div>'
+      +'<div style="background:var(--grid);border-radius:6px;height:12px;overflow:hidden"><div style="width:'+Math.round(k/max*100)+'%;height:100%;border-radius:6px;background:var(--accent)"></div></div></div>';
+  });
+  return html;
+}
+
+/* ---- Render ---- */
+function gateView(){
+  document.getElementById("app").innerHTML=
+  '<div class="gate"><form class="gatecard" id="gateForm">'
+  +'<h1>Makler-Cockpit</h1><div class="s">'+esc(state.settings.brand)+' · Bitte Zugangscode eingeben</div>'
+  +'<input type="password" id="gateCode" placeholder="Zugangscode" autocomplete="current-password" autofocus>'
+  +'<button class="btn primary" type="submit">Anmelden</button>'
+  +'<div class="err" id="gateErr"></div>'
+  +'<div class="gatefoot">Zugang nur für berechtigte Nutzer. Es werden keine Bewerber-Kontaktdaten gespeichert.</div>'
+  +'</form></div>';
+}
+function render(){
+  if(state.settings.code && !ui.authed){ gateView(); return; }
+  var r=rows();
+  var A=r.filter(function(x){return x.stufe==="A";}).length,
+      B=r.filter(function(x){return x.stufe==="B";}).length,
+      C=r.filter(function(x){return x.stufe==="C";}).length;
+  var total=state.anfragen.filter(function(a){var o=objById(a.obj); return o&&o.status==="aktiv";});
+  var bereit=total.filter(function(a){return a.astatus==="bereit";}).length;
+  var pruef=total.length-bereit;
+  var actObjs=state.objekte.filter(function(o){return o.status==="aktiv";});
+  var minPer=state.settings.minProAnfrage||3;
+  var zeitStr=(total.length*minPer/60).toFixed(1).replace(".",",");
+  var chips1='<span class="chiplabel">Objekt</span><button class="chip '+(ui.objF==="alle"?"on":"")+'" data-of="alle">Alle aktiven</button>'
+    +state.objekte.map(function(o){
+      var n=state.anfragen.filter(function(a){return a.obj===o.id;}).length;
+      return '<button class="chip '+(ui.objF===o.id?"on":"")+'" data-of="'+o.id+'">'+esc(o.name)+(o.status!=="aktiv"?" · vermietet":"")+'<span class="cnt">'+n+'</span></button>';
+    }).join("");
+  var stufen=[["alle","Alle"],["A","Einladen"],["B","Nachfragen"],["C","Absagen"]];
+  var chips2='<span class="chiplabel">Filter</span>'+stufen.map(function(s){
+    return '<button class="chip '+(ui.stufeF===s[0]?"on":"")+'" data-sf="'+s[0]+'">'+s[1]+'</button>';
+  }).join("");
+  var list=r.map(function(a){
+    var o=objById(a.obj);
+    return '<div class="row'+(ui.openId===a.id?" open":"")+'" data-id="'+a.id+'">'
+      +'<div class="head"><span class="pill '+a.stufe+'">'+(a.stufe==="A"?"EINLADEN":a.stufe==="B"?"NACHFRAGEN":"ABSAGEN")+'</span>'
+      +'<span class="who">'+esc(a.name)+'</span><span class="obj">'+esc(a.kurz)+'</span>'
+      +(a.real?'<span class="real">✓ '+esc(a.real)+'</span>':'')
+      +'<span class="ts">'+fmtTs(a.ts)+'</span></div>'
+      +'<div class="prev">'+esc(a.text)+'</div>'
+      +'<div class="detail"><div class="facts">'
+      +'<span class="fact"><b>Mietdauer:</b> '+esc(a.dauer)+'</span><span class="fact"><b>Einzug:</b> '+esc(a.einzug)+'</span><span class="fact"><b>Unterlagen:</b> '+esc(a.unterlagen)+'</span></div>'
+      +'<div class="why"><b>Einstufung, weil:</b> '+esc(a.why)+'</div>'
+      +'<div class="draft-h"><span class="t">Ihr Antwortentwurf</span><span style="display:flex;gap:8px">'
+      +'<button class="btn small" data-copy="'+a.id+'">Kopieren</button>'
+      +'<button class="btn small primary" data-send="'+a.id+'">Antwort senden</button>'
+      +'</span></div>'
+      +'<div class="draft">'+esc(draftOf(a))+'</div>'
+      +(a.entwurf.indexOf("{TERMIN}")>=0?'<div class="termhint">Vor dem Senden: Besichtigungstermin selbst wählen und den Platzhalter [TERMIN EINFÜGEN] im Text ersetzen.</div>':'')
+      +(ui.sentHint===a.id?'<div class="senthint">Text kopiert ✓ — öffnet sich Ihr Mail-Programm nicht (in der Vorschau gesperrt), einfach in eine neue E-Mail einfügen. Auf der installierten App öffnet es sich direkt.</div>':'')
+      +'</div></div>';
+  }).join("");
+  if(!list) list='<p style="color:var(--muted);font-size:.9rem;padding:8px 4px">Keine Anfragen in diesem Filter.</p>';
+  var objCards=state.objekte.map(function(o){
+    var n=state.anfragen.filter(function(a){return a.obj===o.id;}).length;
+    return '<div class="objcard'+(o.status!=="aktiv"?" off":"")+'">'
+      +'<span class="badge'+(o.status!=="aktiv"?" off":"")+'">'+(o.status==="aktiv"?"Aktiv":"Vermietet")+'</span>'
+      +'<div class="n" style="margin-top:8px">'+esc(o.name)+'</div>'
+      +'<div class="m">'+(o.miete?o.miete.toLocaleString("de-DE")+" € · ":"")+(o.moebl?esc(o.moebl)+" · ":"")+(o.ab?"ab "+esc(o.ab.split("-").reverse().join("."))+" · ":"")+n+' Anfragen</div>'
+      +((o.refImmowelt||o.refScout)?'<div class="m" style="margin-top:-6px">Zuordnung: '+esc([o.refImmowelt?"IW "+o.refImmowelt:"",o.refScout?"IS "+o.refScout:""].filter(Boolean).join(" · "))+'</div>':'')
+      +(o.krit?'<div class="m" style="margin-top:-6px">Kriterien: '+esc(o.krit.length>70?o.krit.slice(0,70)+"…":o.krit)+'</div>':'')
+      +(o.status==="aktiv"
+        ?'<button class="btn small" data-vermietet="'+o.id+'">Als vermietet markieren</button>'
+        :'<button class="btn small" data-reaktiv="'+o.id+'">Wieder aktivieren</button>')
+      +'</div>';
+  }).join("");
+  var limitFull=actObjs.length>=state.settings.limit;
+  var addForm= ui.addObj
+    ? '<form class="objform" id="objForm">'
+      +'<div class="full"><label>Objekt / Adresse *</label><input id="of-name" placeholder="z. B. 3-Zi Harvestehude, Beispielweg 4" required></div>'
+      +'<div><label>Kaltmiete €</label><input id="of-miete" type="number" min="0" placeholder="1500"></div>'
+      +'<div><label>Möblierung</label><select id="of-moebl"><option>möbliert</option><option>teilmöbliert</option><option>unmöbliert</option></select></div>'
+      +'<div><label>Verfügbar ab</label><input id="of-ab" type="date"></div>'
+      +'<div><label>Wunsch-Mietdauer</label><input id="of-dauer" placeholder="z. B. min. 12 Monate"></div>'
+      +'<div><label>Ref.-Nr. Immowelt</label><input id="of-refi" placeholder="z. B. 3513-04"></div>'
+      +'<div><label>Objekt-ID ImmoScout</label><input id="of-refs" placeholder="z. B. 170398082"></div>'
+      +'<div class="full"><label>Woran erkennen Sie hier einen Top-Kandidaten? *</label><textarea id="of-krit" required placeholder="z. B. vollständige Unterlagen, Einkommen ab 4.500 €, Einzug bis 01.11., keine WG"></textarea></div>'
+      +'<div class="full" style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-a="cancelObj">Abbrechen</button><button class="btn primary" type="submit">Objekt live schalten</button></div>'
+      +'<div class="full limitnote">Über Ref.-Nr. und Objekt-ID ordnet das System eingehende Anfragen automatisch diesem Objekt zu. Die Kriterien steuern die Einstufung ab der ersten Anfrage.</div>'
+      +'</form>'
+    : '<div style="margin-top:14px"><button class="btn primary" data-a="addObj" '+(limitFull?"disabled":"")+'>+ Objekt hinzufügen</button></div>';
+  document.getElementById("app").innerHTML=
+    '<div class="top"><div><h1>Makler-Cockpit</h1><div class="sub">'+(function(){var h=new Date().getHours();var g=h<11?"Guten Morgen":h<18?"Guten Tag":"Guten Abend";return state.settings.kunde?g+", "+esc(state.settings.kunde):esc(state.settings.brand);})()+'</div></div><div style="text-align:right"><div class="sub">'+actObjs.length+' von '+state.settings.limit+' Objekten aktiv</div><div class="savechip" id="savechip">'+chipTxt()+'</div></div></div>'
+    +'<div class="statusline"><span><b>'+total.length+'</b> Anfragen</span><span><b>'+bereit+'</b> geprüft &amp; bereit</span><span><b>'+pruef+'</b> in Qualitätsprüfung</span><span style="margin-left:auto"><button class="btn small" data-a="logout">Abmelden</button></span></div>'
+    +'<div class="chips">'+chips1+'</div>'
+    +'<div class="chips second">'+chips2+'</div>'
+    +'<div class="kpis">'
+    +'<div class="kpi t"><div class="v">\u2248 '+zeitStr+' Std.</div><div class="l">Zeit gespart (gesamt)</div></div>'
+    +'<div class="kpi"><div class="v">'+r.length+'</div><div class="l">Anfragen im Filter</div></div>'
+    +'<div class="kpi a"><div class="v">'+A+'</div><div class="l">A · Einladen</div></div>'
+    +'<div class="kpi b"><div class="v">'+B+'</div><div class="l">B · Nachfragen</div></div>'
+    +'<div class="kpi c"><div class="v">'+C+'</div><div class="l">C · Absagen</div></div>'
+    +'</div>'
+    +'<div class="grid2">'
+    +'<div class="card"><h2>Verlauf der Anfragen</h2>'+lineChart()+'<div class="chnote">Füllt sich im Pilotbetrieb mit jedem Tag weiter.</div></div>'
+    +'<div class="card"><h2>Struktur der Anfragen</h2>'+typChart()+'<div style="height:18px"></div><h2>Objekte im Vergleich</h2>'+objChart()+'</div>'
+    +'</div>'
+    +'<div class="card inbox" style="margin-bottom:26px"><h2>Posteingang — vorsortiert</h2>'+list+'</div>'
+    +'<div class="card"><h2>Ihre Objekte</h2><div class="objgrid">'+objCards+'</div>'+addForm
+    +'<div class="limitnote">Ihr Paket umfasst '+state.settings.limit+' aktive Objekte'+(limitFull?' — Limit erreicht. Für weitere Objekte sprechen Sie Ihren Assistenten an.':'.')+'</div></div>'
+    +'<footer>Es wird nichts versendet, was Sie nicht freigegeben haben. „Antwort senden“ öffnet Ihr Mail-Programm — Absenderin bleiben Sie. · '+esc(state.settings.brand)+'</footer>';
+}
+
+/* ---- Events ---- */
+document.addEventListener("submit",function(ev){
+  var f=ev.target;
+  if(f.id==="gateForm"){
+    ev.preventDefault();
+    var v=document.getElementById("gateCode").value.trim();
+    if(v===state.settings.code){ui.authed=true; try{sessionStorage.setItem("mc-auth-winkler","1");}catch(e){} render();}
+    else{document.getElementById("gateErr").textContent="Code nicht korrekt — bitte erneut versuchen.";}
+  } else if(f.id==="objForm"){
+    ev.preventDefault();
+    var name=document.getElementById("of-name").value.trim();
+    if(!name) return;
+    var act=state.objekte.filter(function(o){return o.status==="aktiv";}).length;
+    if(act>=state.settings.limit) return;
+    state.objekte.push({id:uid(), name:name,
+      miete:Number(document.getElementById("of-miete").value)||0,
+      moebl:document.getElementById("of-moebl").value,
+      ab:document.getElementById("of-ab").value,
+      dauer:document.getElementById("of-dauer").value.trim(),
+      refImmowelt:document.getElementById("of-refi").value.trim(),
+      refScout:document.getElementById("of-refs").value.trim(),
+      krit:document.getElementById("of-krit").value.trim(),
+      status:"aktiv"});
+    ui.addObj=false; commit();
+  }
+});
+document.addEventListener("click",function(ev){
+  var el;
+  if(el=ev.target.closest("[data-of]")){ui.objF=el.getAttribute("data-of"); ui.openId=null; render(); return;}
+  if(el=ev.target.closest("[data-sf]")){ui.stufeF=el.getAttribute("data-sf"); ui.openId=null; render(); return;}
+  if(el=ev.target.closest("[data-copy]")){
+    var id=Number(el.getAttribute("data-copy"));
+    var a=state.anfragen.find(function(x){return x.id===id;});
+    if(a&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(draftOf(a));}
+    el.textContent="Kopiert ✓"; setTimeout(function(){try{el.textContent="Kopieren";}catch(e){}},1400);
+    ev.stopPropagation(); return;
+  }
+  if(el=ev.target.closest("[data-send]")){
+    var idS=Number(el.getAttribute("data-send"));
+    var aS=state.anfragen.find(function(x){return x.id===idS;});
+    if(aS){
+      var oS=objById(aS.obj), txt=draftOf(aS);
+      try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt);}catch(e){}
+      ui.sentHint=idS; render();
+      try{window.location.href='mailto:?subject='+encodeURIComponent('Ihre Anfrage — '+(oS?oS.name:""))+'&body='+encodeURIComponent(txt);}catch(e){}
+    }
+    ev.stopPropagation(); return;
+  }
+  if(el=ev.target.closest("[data-vermietet]")){var o=objById(el.getAttribute("data-vermietet")); if(o){o.status="vermietet"; if(ui.objF===o.id)ui.objF="alle"; commit();} return;}
+  if(el=ev.target.closest("[data-reaktiv]")){
+    var o2=objById(el.getAttribute("data-reaktiv"));
+    var act=state.objekte.filter(function(x){return x.status==="aktiv";}).length;
+    if(o2){ if(act>=state.settings.limit){alert("Objekt-Limit erreicht — bitte zuerst ein Objekt als vermietet markieren oder das Paket erweitern.");} else {o2.status="aktiv"; commit();} }
+    return;
+  }
+  if(el=ev.target.closest("[data-a]")){
+    var a=el.getAttribute("data-a");
+    if(a==="addObj"){ui.addObj=true; render();}
+    else if(a==="cancelObj"){ui.addObj=false; render();}
+    else if(a==="logout"){ui.authed=false; try{sessionStorage.removeItem("mc-auth-winkler");}catch(e){} render();}
+    return;
+  }
+  var row=ev.target.closest(".row[data-id]");
+  if(row){var id2=Number(row.getAttribute("data-id")); ui.openId=(ui.openId===id2?null:id2); render();}
+});
+
+/* ---- Boot ---- */
+(function boot(){
+  try{state=JSON.parse(document.getElementById("state").textContent);}catch(e){state=null;}
+  if(!state||!state.anfragen){state={savedAt:1,settings:{code:"",limit:3,brand:"Anfragen-Assistent"},objekte:[],anfragen:[]};}
+  embeddedSavedAt=state.savedAt||1;
+  try{var loc=JSON.parse(localStorage.getItem("mc-state-winkler")||"null"); if(loc&&loc.savedAt>embeddedSavedAt){state=loc;}}catch(e){}
+  try{ui.authed = sessionStorage.getItem("mc-auth-winkler")==="1";}catch(e){}
+  render();
+  /* ---- Pipeline-Sync: neue Anfragen aus data.json uebernehmen ---- */
+  try{
+    fetch("data.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
+      if(!d)return;
+      var changed=false;
+      if(d.anfragen&&d.anfragen.length){
+        var known={}; state.anfragen.forEach(function(a){known[String(a.id)]=1;});
+        d.anfragen.forEach(function(a){ if(a&&a.id!=null&&!known[String(a.id)]){state.anfragen.push(a);changed=true;} });
+      }
+      if(d.objekte&&d.objekte.length){
+        var ko={}; state.objekte.forEach(function(o){ko[String(o.id)]=1;});
+        d.objekte.forEach(function(o){ if(o&&o.id!=null&&!ko[String(o.id)]){state.objekte.push(o);changed=true;} });
+      }
+      if(changed){ state.savedAt=Date.now(); try{localStorage.setItem("mc-state-winkler",JSON.stringify(state));}catch(e){} render(); }
+    }).catch(function(){});
+  }catch(e){}
+  var useFn=(typeof claude!=="undefined"&&claude&&claude.use)?claude.use:null;
+  if(useFn){
+    useFn("artifact").then(function(a){
+      cap=a; capKnown=true;
+      if(saveMode==="init"||saveMode==="local"){saveMode=a?"saved":"viewer";}
+      updateChip();
+      if(a&&state.savedAt>embeddedSavedAt){schedulePublish();}
+    });
+  } else {capKnown=true; saveMode="local"; updateChip();}
+})();
+})();
+</script>
+<script>if("serviceWorker" in navigator){addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(){})})}</script></body></html>
