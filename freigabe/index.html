@@ -46,8 +46,8 @@ input{font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-r
 <div id="app" class="wrap"></div>
 <script>
 var CODE="kairo";
-var PENDING_URL="../winkler/pending.json";
-var DATA_URL="../winkler/data.json";
+var PENDING_URL="https://raw.githubusercontent.com/kairos-gate/kairos-gate.github.io/main/winkler/pending.json";
+var DATA_URL="https://raw.githubusercontent.com/kairos-gate/kairos-gate.github.io/main/winkler/data.json";
 var state={authed:false,webhook:"",pending:[],live:[],sent:{},loading:true,err:""};
 try{state.authed=sessionStorage.getItem("fg-auth")==="1";}catch(e){}
 try{state.webhook=localStorage.getItem("fg-webhook")||"";}catch(e){}
