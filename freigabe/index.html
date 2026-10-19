@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kairos Freigabe</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../winkler/icon-192.png">
+<meta name="theme-color" content="#0C5F45">
+<style>
+:root{--bg:#F5F0E6;--card:#FFFFFF;--ink:#1E2A26;--muted:#6B7570;--green:#0C5F45;--green2:#0E7A57;--line:#E3DCCB;
+--a:#0C5F45;--b:#B87A1E;--c:#A8463A;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 60px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 2px 10px}
+h1{font-size:1.25rem;margin:0;color:var(--green)}
+.sub{font-size:.8rem;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.badge{display:inline-block;min-width:26px;text-align:center;padding:3px 9px;border-radius:999px;color:#fff;font-weight:700;font-size:.85rem}
+.badge.A{background:var(--a)}.badge.B{background:var(--b)}.badge.C{background:var(--c)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.name{font-weight:700}
+.meta{font-size:.82rem;color:var(--muted);margin:6px 0}
+.why{font-size:.9rem;margin:6px 0 10px}
+details{margin:6px 0;border-top:1px dashed var(--line);padding-top:6px}
+summary{cursor:pointer;font-size:.85rem;color:var(--green);font-weight:600}
+pre{white-space:pre-wrap;font-family:inherit;font-size:.9rem;background:var(--bg);border-radius:10px;padding:10px;margin:8px 0 2px}
+button{font:inherit;border:0;border-radius:12px;padding:12px 16px;cursor:pointer}
+.go{background:var(--green);color:#fff;font-weight:700;width:100%;font-size:1rem}
+.go:disabled{opacity:.55}
+.done{background:#EAF3EE;color:var(--green);font-weight:700;width:100%;border:1px solid #CBE2D5}
+.ghost{background:transparent;color:var(--muted);font-size:.8rem;padding:6px}
+input{font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.gate{max-width:360px;margin:16vh auto 0;text-align:center}
+.gate h1{margin-bottom:4px}
+.err{color:var(--c);font-size:.85rem;min-height:1.2em;margin-top:8px}
+.note{font-size:.78rem;color:var(--muted);margin-top:10px;line-height:1.4}
+.pill{font-size:.75rem;background:#EAF3EE;color:var(--green);border-radius:999px;padding:3px 10px}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.topbtns{display:flex;gap:8px}
+.stat{font-size:.8rem;color:var(--muted);text-align:center;margin:4px 0 12px}
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+<script>
+var CODE="kairo";
+var PENDING_URL="../winkler/pending.json";
+var DATA_URL="../winkler/data.json";
+var state={authed:false,webhook:"",pending:[],live:[],sent:{},loading:true,err:""};
+try{state.authed=sessionStorage.getItem("fg-auth")==="1";}catch(e){}
+try{state.webhook=localStorage.getItem("fg-webhook")||"";}catch(e){}
+try{state.sent=JSON.parse(localStorage.getItem("fg-sent")||"{}");}catch(e){state.sent={};}
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+
+function load(){
+  state.loading=true; render();
+  var t=Date.now();
+  Promise.all([
+    fetch(PENDING_URL+"?t="+t,{cache:"no-store"}).then(function(r){return r.ok?r.json():{anfragen:[]};}).catch(function(){return {anfragen:[]};}),
+    fetch(DATA_URL+"?t="+t,{cache:"no-store"}).then(function(r){return r.ok?r.json():{anfragen:[]};}).catch(function(){return {anfragen:[]};})
+  ]).then(function(res){
+    state.pending=(res[0].anfragen||[]).filter(function(a){return a&&a.id;});
+    state.live=(res[1].anfragen||[]).map(function(a){return String(a.id);});
+    state.loading=false; render();
+  });
+}
+
+function freigeben(a,btn){
+  if(!state.webhook){alert("Bitte zuerst unten die Freigabe-Adresse einrichten.");return;}
+  btn.disabled=true; btn.textContent="Wird übertragen…";
+  var url=state.webhook+"?d="+encodeURIComponent(JSON.stringify(a));
+  fetch(url,{mode:"no-cors"}).catch(function(){}).then(function(){
+    state.sent[String(a.id)]=Date.now();
+    try{localStorage.setItem("fg-sent",JSON.stringify(state.sent));}catch(e){}
+    render();
+    setTimeout(load,25000);
+  });
+}
+
+function statusOf(a){
+  var id=String(a.id);
+  if(state.live.indexOf(id)>=0) return "live";
+  if(state.sent[id]) return "sent";
+  return "open";
+}
+
+function render(){
+  var el=document.getElementById("app");
+  if(!state.authed){
+    el.innerHTML='<div class="gate card"><h1>Kairos Freigabe</h1><div class="sub">Bitte Zugangscode eingeben</div>'
+      +'<p></p><input type="password" id="gc" placeholder="Zugangscode" autofocus>'
+      +'<p></p><button class="go" id="gbtn">Öffnen</button><div class="err" id="gerr"></div></div>';
+    document.getElementById("gbtn").onclick=tryGate;
+    document.getElementById("gc").addEventListener("keydown",function(e){if(e.key==="Enter")tryGate();});
+    return;
+  }
+  var h='<header><div><h1>Freigabe-Zentrale</h1><div class="sub">Kunde: Frau Winkler · Rothenbaum</div></div>'
+    +'<div class="topbtns"><button class="ghost" id="reload">↻ Aktualisieren</button></div></header>';
+  if(state.loading){ el.innerHTML=h+'<div class="empty">Lade Anfragen…</div>'; bind(); return; }
+  var open=[],done=[];
+  state.pending.slice().reverse().forEach(function(a){ (statusOf(a)==="open"?open:done).push(a); });
+  h+='<div class="stat">'+open.length+' offen · '+done.length+' erledigt</div>';
+  if(!open.length&&!done.length){ h+='<div class="empty">Noch keine Anfragen in der Warteschlange.<br>Sobald eine Mail eingestuft wurde, erscheint sie hier.</div>'; }
+  open.forEach(function(a){ h+=cardHtml(a,"open"); });
+  if(done.length){ h+='<p class="sub" style="margin-top:22px">Erledigt</p>'; done.forEach(function(a){ h+=cardHtml(a,statusOf(a)); }); }
+  h+='<div class="card"><details><summary>⚙️ Einrichtung (Freigabe-Adresse)</summary>'
+    +'<p class="note">Füge hier einmalig die Webhook-Adresse deines Freigabe-Szenarios ein (https://hook.eu…). Sie wird nur auf diesem Gerät gespeichert.</p>'
+    +'<input id="wh" placeholder="https://hook.eu…make.com/…" value="'+esc(state.webhook)+'">'
+    +'<p></p><button class="go" id="whsave">Speichern</button></details></div>';
+  el.innerHTML=h; bind();
+}
+
+function cardHtml(a,st){
+  var btn = st==="open" ? '<button class="go" data-id="'+esc(a.id)+'">✅ FREIGEBEN — ins Cockpit übernehmen</button>'
+    : st==="sent" ? '<button class="done" disabled>Übertragen — erscheint in 1–2 Min im Cockpit…</button>'
+    : '<button class="done" disabled>✓ Im Cockpit von Frau Winkler</button>';
+  return '<div class="card">'
+    +'<div class="row"><span class="badge '+esc(a.stufe)+'">'+esc(a.stufe)+'</span><span class="name">'+esc(a.name)+'</span><span class="pill">'+esc(a.kurz)+'</span></div>'
+    +'<div class="meta">Einzug: '+esc(a.einzug)+' · Dauer: '+esc(a.dauer)+' · Unterlagen: '+esc(a.unterlagen)+(a.ts?(' · '+esc(a.ts)):'')+'</div>'
+    +'<div class="why">'+esc(a.why)+'</div>'
+    +'<details><summary>Antwortentwurf ansehen</summary><pre>'+esc(a.entwurf)+'</pre></details>'
+    +'<details><summary>Original-Anfrage</summary><pre>'+esc(a.text)+'</pre></details>'
+    +'<p></p>'+btn+'</div>';
+}
+
+function bind(){
+  var r=document.getElementById("reload"); if(r) r.onclick=load;
+  var ws=document.getElementById("whsave");
+  if(ws) ws.onclick=function(){
+    var v=document.getElementById("wh").value.trim();
+    if(v&&v.indexOf("https://hook.")!==0){alert("Das sieht nicht nach einer Make-Webhook-Adresse aus (muss mit https://hook. beginnen).");return;}
+    state.webhook=v; try{localStorage.setItem("fg-webhook",v);}catch(e){}
+    alert(v?"Gespeichert ✓":"Adresse entfernt."); render();
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("button.go[data-id]"),function(b){
+    b.onclick=function(){
+      var id=b.getAttribute("data-id");
+      var a=state.pending.filter(function(x){return String(x.id)===String(id);})[0];
+      if(a) freigeben(a,b);
+    };
+  });
+}
+
+function tryGate(){
+  var v=document.getElementById("gc").value.trim();
+  if(v===CODE){state.authed=true;try{sessionStorage.setItem("fg-auth","1");}catch(e){} load();}
+  else{document.getElementById("gerr").textContent="Code nicht korrekt — bitte erneut versuchen.";}
+}
+
+if(state.authed) load(); else render();
+setInterval(function(){ if(state.authed&&!state.loading) load(); },120000);
+</script>
+</body>
+</html>
