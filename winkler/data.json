@@ -2,4 +2,6 @@
 {"id":999001,"obj":"o1","ts":"2026-10-06T12:00","name":"Interessentin T. T.","kurz":"Pipeline-Testlauf","typ":"komplett","stufe":"A","astatus":"bereit","dauer":"12 Monate","einzug":"ab sofort","unterlagen":"vollständig","why":"Testlauf der Freigabe-Pipeline — kann gelöscht werden.","text":"Dies ist ein Testeintrag der Freigabe-Pipeline.","entwurf":"Sehr geehrte Frau T.,\ndies ist ein automatischer Testeintrag.\n\nGrüße, Anett Winkler"}
 ,
 
+,
+{"id":1792424236,"obj":"o1","ts":"2026-10-19T17:37","name":"Interessent J. P.","kurz":"Controllerin, 3.200€ netto, sofort","typ":"teilweise","stufe":"A","astatus":"bereit","dauer":"mind. 2 Jahre","einzug":"sofort","unterlagen":"Schufa und Gehaltsnachweise angekündigt","why":"Einkommen übersteigt 3x-Faustregel deutlich, Mietdauer passt, Unterlagen zugesagt.","text":"29, fest angestellt als Controllerin, 3.200€ netto, sucht ab sofort für mind. 2 Jahre, Schufa und Gehaltsnachweise kurzfristig verfügbar.","entwurf":"Liebe Frau P.,\n\nvielen Dank für Ihr Interesse an der 2-Zimmer-Wohnung am Rothenbaum. Ihre Anfrage ist sehr vielversprechend. Gerne laden wir Sie zu einer Besichtigung ein — können Sie sich {TERMIN} Zeit nehmen?\n\nBitte reichen Sie die Schufa und die Gehaltsnachweise bis dahin nach.\n\nGrüße, Anett Winkler"}
 ]}
