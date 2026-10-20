@@ -250,6 +250,7 @@ function render(){
   var chips2='<span class="chiplabel">Filter</span>'+stufen.map(function(s){
     return '<button class="chip '+(ui.stufeF===s[0]?"on":"")+'" data-sf="'+s[0]+'">'+s[1]+'</button>';
   }).join("");
+  r=r.slice().sort(function(a,b){return Number(b.id)-Number(a.id);});
   var list=r.map(function(a){
     var o=objById(a.obj);
     return '<div class="row'+(ui.openId===a.id?" open":"")+'" data-id="'+a.id+'">'
