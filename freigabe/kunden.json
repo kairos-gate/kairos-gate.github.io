@@ -13,6 +13,12 @@
    "code": "eppendorf"
   },
   {
+   "slug": "schmidt",
+   "name": "Frau Maria Schmidt",
+   "objekt": "Elbchaussee 7 · 2-Zi mit Balkon",
+   "code": "elbblick"
+  },
+  {
    "slug": "unklar",
    "name": "Nicht zugeordnet",
    "objekt": "Sammelbecken für unklare Anfragen",
