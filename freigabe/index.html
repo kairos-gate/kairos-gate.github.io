@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kairos Zentrale</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="../winkler/icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#0C5F45">
 <style>
 :root{--bg:#F5F0E6;--card:#FFFFFF;--ink:#1E2A26;--muted:#6B7570;--green:#0C5F45;--green2:#0E7A57;--line:#E3DCCB;
@@ -192,8 +192,8 @@ function render(){
       else{ if(st==="open")openCnt++; open.push({ku:ku,a:a,st:st}); }
     });
   });
-  open.sort(function(x,y){return String(y.a.id)<String(x.a.id)?-1:1;});
-  done.sort(function(x,y){return String(y.a.id)<String(x.a.id)?-1:1;});
+  open.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
+  done.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
 
   h+='<p class="sect">Zu entscheiden ('+openCnt+')</p>';
   if(!open.length){ h+='<div class="empty">Nichts offen — alles entschieden.<br>Neue eingestufte Anfragen erscheinen hier automatisch.</div>'; }
