@@ -85,6 +85,9 @@ svg text{font-family:"IBM Plex Mono",monospace; font-size:10px; fill:var(--muted
 .kpi.t .v{color:var(--accent-ink)}
 .senthint{font-size:.78rem; color:var(--accent-ink); margin-top:8px}
 .termhint{font-size:.78rem; color:var(--b-ink); margin-top:8px}
+.termrow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.termlabel{font-size:.78rem;font-weight:700;color:var(--accent-ink);white-space:nowrap}
+.terminput{flex:1;min-width:190px;font:inherit;font-size:.85rem;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
 footer{margin-top:38px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:.79rem}
 /* Login */
 .gate{min-height:82vh; display:flex; align-items:center; justify-content:center}
@@ -121,7 +124,15 @@ var ui={objF:"alle", stufeF:"alle", openId:null, authed:false, addObj:false, sen
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function uid(){return "o"+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);}
 function objById(id){for(var i=0;i<state.objekte.length;i++) if(state.objekte[i].id===id) return state.objekte[i]; return null;}
-function draftOf(a){return a.entwurf.split("{TERMIN}").join("[TERMIN EINFÜGEN]");}
+function draftOf(a){var t=String(a.termin||"").trim(); return t? a.entwurf.split("{TERMIN}").join(t) : a.entwurf.split("{TERMIN}").join("[TERMIN EINFÜGEN]");}
+document.addEventListener("input",function(ev){
+  var el=(ev.target&&ev.target.closest)?ev.target.closest("[data-termin]"):null; if(!el)return;
+  var id=Number(el.getAttribute("data-termin"));
+  var a=state.anfragen.find(function(x){return x.id===id;}); if(!a)return;
+  a.termin=el.value; state.savedAt=Date.now();
+  try{persistLocal();}catch(e){}
+  var d=document.querySelector('[data-draft="'+id+'"]'); if(d) d.textContent=draftOf(a);
+});
 function fmtTs(ts){
   if(ts.indexOf("T")<0){var p=ts.split("-");return p[2]+"."+p[1]+".";}
   var d=new Date(ts);return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
@@ -266,8 +277,8 @@ function render(){
       +'<button class="btn small" data-copy="'+a.id+'">Kopieren</button>'
       +'<button class="btn small primary" data-send="'+a.id+'">Antwort senden</button>'
       +'</span></div>'
-      +'<div class="draft">'+esc(draftOf(a))+'</div>'
-      +(a.entwurf.indexOf("{TERMIN}")>=0?'<div class="termhint">Vor dem Senden: Besichtigungstermin selbst wählen und den Platzhalter [TERMIN EINFÜGEN] im Text ersetzen.</div>':'')
+      +'<div class="draft" data-draft="'+a.id+'">'+esc(draftOf(a))+'</div>'
+      +(a.entwurf.indexOf("{TERMIN}")>=0?'<div class="termrow"><span class="termlabel">📅 Besichtigungstermin:</span><input class="terminput" data-termin="'+a.id+'" placeholder="z. B. Donnerstag, 24.10., 17:00 Uhr" value="'+esc(a.termin||"")+'"></div><div class="termhint">'+(String(a.termin||"").trim()?'Termin eingesetzt ✓ — der Entwurf ist versandbereit.':'Termin eintippen — er ersetzt automatisch den Platzhalter im Entwurf.')+'</div>':'')
       +(ui.sentHint===a.id?'<div class="senthint">Text kopiert ✓ — öffnet sich Ihr Mail-Programm nicht (in der Vorschau gesperrt), einfach in eine neue E-Mail einfügen. Auf der installierten App öffnet es sich direkt.</div>':'')
       +'</div></div>';
   }).join("");
@@ -349,6 +360,7 @@ document.addEventListener("submit",function(ev){
   }
 });
 document.addEventListener("click",function(ev){
+  if(ev.target&&ev.target.closest&&ev.target.closest(".terminput")) return;
   var el;
   if(el=ev.target.closest("[data-of]")){ui.objF=el.getAttribute("data-of"); ui.openId=null; render(); return;}
   if(el=ev.target.closest("[data-sf]")){ui.stufeF=el.getAttribute("data-sf"); ui.openId=null; render(); return;}
@@ -363,6 +375,11 @@ document.addEventListener("click",function(ev){
     var idS=Number(el.getAttribute("data-send"));
     var aS=state.anfragen.find(function(x){return x.id===idS;});
     if(aS){
+      if(aS.entwurf.indexOf("{TERMIN}")>=0&&!String(aS.termin||"").trim()){
+        var ti=document.querySelector('[data-termin="'+idS+'"]');
+        if(ti){ti.focus();ti.style.borderColor="#A8463A";setTimeout(function(){try{ti.style.borderColor="";}catch(e){}},1600);}
+        ev.stopPropagation(); return;
+      }
       var oS=objById(aS.obj), txt=draftOf(aS);
       try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt);}catch(e){}
       ui.sentHint=idS; render();
