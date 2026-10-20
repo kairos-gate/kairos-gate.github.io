@@ -91,7 +91,13 @@ function bufToB64(buf){var bin="",u=new Uint8Array(buf);for(var i=0;i<u.length;i
 function ghHeaders(){return {"Authorization":"Bearer "+ghTokenGet(),"Accept":"application/vnd.github+json"};}
 function ghGet(path){return fetch(GH_API+path+"?t="+Date.now(),{headers:ghHeaders()}).then(function(r){if(r.status===404)return null;if(!r.ok)throw new Error("GitHub-Fehler "+r.status+" beim Lesen von "+path);return r.json();});}
 function ghPut(path,b64,msg){return ghGet(path).then(function(ex){var body={message:msg,content:b64};if(ex&&ex.sha)body.sha=ex.sha;return fetch(GH_API+path,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)});}).then(function(r){if(!r.ok)return r.json()["catch"](function(){return{};}).then(function(j){throw new Error("GitHub-Fehler "+r.status+" bei "+path+(j&&j.message?" ("+j.message+")":""));});return r.json();});}
-function slugVorschlag(s){return String(s).toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]+/g,"").slice(0,20);}
+function clean(s){return String(s).replace(/[\u201e\u201c\u201d\u2018\u2019\u00ab\u00bb"']/g,"").replace(/\s+/g," ").trim();}
+function slugVorschlag(s){
+  s=String(s).toLowerCase().replace(/\b(frau|herr|herrn|familie|firma|immobilien|gmbh|gbr|kg|ag|ug|makler)\b/g," ").trim();
+  var w=s.split(/\s+/).filter(function(x){return x;});
+  if(w.length)s=w[w.length-1];
+  return s.replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]+/g,"").slice(0,20);
+}
 function nkStep(txt,cls){try{var b=document.getElementById("nk-steps");if(b){b.style.display="block";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=txt;b.appendChild(d);}}catch(e){}}
 function neuerKunde(f){
   var btn=document.getElementById("nk-go"); if(btn){btn.disabled=true;btn.textContent="Lege Kunden an…";}
@@ -310,7 +316,7 @@ function render(){
     +'<p class="note" style="margin-top:18px"><b>GitHub-Schl\u00fcssel</b> \u2014 nur n\u00f6tig, damit die Zentrale neue Kunden selbst anlegen kann ('+(ghTokenGet()?'hinterlegt \u2713':'noch nicht hinterlegt')+'). Er wird nur auf diesem Ger\u00e4t gespeichert.</p>'
     +'<input id="ghtok" type="password" placeholder="github_pat_\u2026" value="'+esc(ghTokenGet())+'">'
     +'<p></p><button class="go" id="ghtoksave">Schl\u00fcssel speichern</button></details></div>';
-  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 3</p>';
+  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 3.1</p>';
   el.innerHTML=h; bind();
 }
 
@@ -341,7 +347,7 @@ function bind(){
   var ng=document.getElementById("nk-go");
   if(ng) ng.onclick=function(){
     function val(id){var e=document.getElementById(id);return e?e.value.trim():"";}
-    var f={name:val("nk-name"),slug:val("nk-slug").toLowerCase(),code:val("nk-code").toLowerCase(),objekt:val("nk-obj"),miete:Number(val("nk-miete").replace(/[^0-9]/g,"")),dauer:val("nk-dauer"),krit:val("nk-krit"),scout:val("nk-scout"),iw:val("nk-iw")};
+    var f={name:clean(val("nk-name")),slug:val("nk-slug").toLowerCase(),code:val("nk-code").toLowerCase(),objekt:clean(val("nk-obj")),miete:Number(val("nk-miete").replace(/[^0-9]/g,"")),dauer:clean(val("nk-dauer")),krit:clean(val("nk-krit")),scout:val("nk-scout").replace(/[^0-9a-zA-Z-]/g,""),iw:val("nk-iw").replace(/[^0-9a-zA-Z-]/g,"")};
     if(!/^[^<>&"]{2,40}$/.test(f.name)){alert("Bitte einen Kundennamen eingeben (2\u201340 Zeichen, ohne Sonderzeichen wie < > &).");return;}
     if(!/^[a-z0-9-]{2,20}$/.test(f.slug)){alert("Die Kennung darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten (2\u201320 Zeichen).");return;}
     if(RESERVIERT.indexOf(f.slug)>=0){alert("Diese Kennung ist reserviert \u2014 bitte eine andere w\u00e4hlen.");return;}
