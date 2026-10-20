@@ -13,6 +13,12 @@
    "code": "eppendorf"
   },
   {
+   "slug": "fraumariaschmidt",
+   "name": "frau maria schmidt",
+   "objekt": "Elbchaussee 7 · 2-Zi mit Balkon”, 1600",
+   "code": "abcd"
+  },
+  {
    "slug": "unklar",
    "name": "Nicht zugeordnet",
    "objekt": "Sammelbecken für unklare Anfragen",
