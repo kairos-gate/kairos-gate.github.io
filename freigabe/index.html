@@ -70,11 +70,8 @@ var DEFAULT_KUNDEN=[{"slug":"winkler","name":"Frau Winkler","objekt":"Privatstra
 var state={authed:false,kunden:DEFAULT_KUNDEN.slice(),per:{},sent:{},loading:true};
 try{state.authed=sessionStorage.getItem("fg-auth")==="1";}catch(e){}
 try{state.sent=JSON.parse(localStorage.getItem("fg-sent")||"{}");}catch(e){state.sent={};}
-/* Umzug von der alten Freigabe-Zentrale: gespeicherte Adresse gilt jetzt fuer Winkler */
-try{var _old=localStorage.getItem("fg-webhook");if(_old&&!localStorage.getItem("fg-webhook-winkler")){localStorage.setItem("fg-webhook-winkler",_old);}}catch(e){}
-
-function whGet(slug){try{return localStorage.getItem("fg-webhook-"+slug)||"";}catch(e){return "";}}
-function whSet(slug,v){try{if(v){localStorage.setItem("fg-webhook-"+slug,v);}else{localStorage.removeItem("fg-webhook-"+slug);}}catch(e){}}
+function whGet(){try{return localStorage.getItem("fg-webhook-all")||"";}catch(e){return "";}}
+function whSet(v){try{if(v){localStorage.setItem("fg-webhook-all",v);}else{localStorage.removeItem("fg-webhook-all");}}catch(e){}}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
 function jget(url){return fetch(url,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});}
 
@@ -106,10 +103,10 @@ function statusOf(ku,a){
 }
 
 function freigeben(ku,a,btn){
-  var wh=whGet(ku.slug);
-  if(!wh){alert("Bitte zuerst in der Karte von "+ku.name+" unter „Freigabe-Adresse“ die Webhook-Adresse eintragen.");return;}
+  var wh=whGet();
+  if(!wh){alert("Bitte zuerst ganz unten unter „Einrichtung“ die Freigabe-Adresse eintragen.");return;}
   btn.disabled=true; btn.textContent="Wird übertragen…";
-  fetch(wh+"?d="+encodeURIComponent(JSON.stringify(a)),{mode:"no-cors"}).catch(function(){}).then(function(){
+  fetch(wh+"?d="+encodeURIComponent(JSON.stringify(a))+"&slug="+encodeURIComponent(ku.slug),{mode:"no-cors"}).catch(function(){}).then(function(){
     state.sent[String(a.id)]=Date.now();
     try{localStorage.setItem("fg-sent",JSON.stringify(state.sent));}catch(e){}
     render();
@@ -120,20 +117,16 @@ function freigeben(ku,a,btn){
 function kundeCard(ku){
   var p=state.per[ku.slug]||{pending:[],live:[]};
   var offen=0; p.pending.forEach(function(a){ if(statusOf(ku,a)==="open") offen++; });
-  var wh=whGet(ku.slug);
-  var whPill=wh?'<span class="okpill">Freigabe-Adresse ✓</span>':'<span class="warnpill">Freigabe-Adresse fehlt</span>';
+  var foot = ku.slug==="unklar"
+    ? '<p class="note" style="margin-top:10px">Hier landen Anfragen, die die KI keinem Kunden sicher zuordnen konnte. Zum Klären: Original-Mail mit eindeutigem Objektnamen erneut an den Briefkasten senden.</p>'
+    : '<div class="kfoot"><a class="linkbtn" href="'+esc(PAGES+ku.slug+"/")+'" target="_blank" rel="noopener">Cockpit öffnen ↗</a>'
+      +'<span class="codeline">Zugang: <b>'+esc(ku.code||"–")+'</b></span></div>';
   return '<div class="card">'
     +'<div class="kname">'+esc(ku.name)+'</div>'
     +'<div class="kobj">'+esc(ku.objekt)+'</div>'
     +'<div class="knums"><span class="num o">'+offen+'</span><span class="numlabel">zu entscheiden</span>'
     +'<span class="num g">'+p.live.length+'</span><span class="numlabel">im Cockpit</span></div>'
-    +'<div class="kfoot"><a class="linkbtn" href="'+esc(PAGES+ku.slug+"/")+'" target="_blank" rel="noopener">Cockpit öffnen ↗</a>'
-    +'<span class="codeline">Zugang: <b>'+esc(ku.code||"–")+'</b></span></div>'
-    +'<div class="whline">'+whPill+'</div>'
-    +'<details><summary>⚙️ Freigabe-Adresse einstellen</summary>'
-    +'<p class="note">Webhook-Adresse des Freigabe-Szenarios dieses Kunden (https://hook.eu…). Sie wird nur auf diesem Gerät gespeichert.</p>'
-    +'<input id="wh-'+esc(ku.slug)+'" placeholder="https://hook.eu…make.com/…" value="'+esc(wh)+'">'
-    +'<p></p><button class="go whsave" data-slug="'+esc(ku.slug)+'">Speichern</button></details>'
+    +foot
     +'</div>';
 }
 
@@ -151,7 +144,8 @@ function addCard(){
 }
 
 function cardHtml(ku,a,st){
-  var btn = st==="open" ? '<button class="go" data-id="'+esc(a.id)+'" data-slug="'+esc(ku.slug)+'">✅ FREIGEBEN — ins Cockpit übernehmen</button>'
+  var btn = ku.slug==="unklar" ? '<button class="done" disabled>Zuordnung unklar — Mail mit eindeutigem Objekt neu senden</button>'
+    : st==="open" ? '<button class="go" data-id="'+esc(a.id)+'" data-slug="'+esc(ku.slug)+'">✅ FREIGEBEN — ins Cockpit übernehmen</button>'
     : st==="sent" ? '<button class="done" disabled>Übertragen — erscheint in 1–2 Min im Cockpit…</button>'
     : '<button class="done" disabled>✓ Im Cockpit von '+esc(ku.name)+'</button>';
   return '<div class="card">'
@@ -204,23 +198,25 @@ function render(){
     done.forEach(function(x){ h+=cardHtml(x.ku,x.a,x.st); });
     h+='</details>';
   }
-  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 1</p>';
+  h+='<div class="card" style="margin-top:22px"><details'+(whGet()?'':' open')+'><summary>⚙️ Einrichtung — Freigabe-Adresse '+(whGet()?'✓':'(fehlt!)')+'</summary>'
+    +'<p class="note">Die eine Webhook-Adresse deines Freigabe-Szenarios für ALLE Kunden (beginnt mit https://hook.eu…). Sie wird nur auf diesem Gerät gespeichert.</p>'
+    +'<input id="whall" placeholder="https://hook.eu…make.com/…" value="'+esc(whGet())+'">'
+    +'<p></p><button class="go" id="whallsave">Speichern</button></details></div>';
+  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 2</p>';
   el.innerHTML=h; bind();
 }
 
 function bind(){
   var r=document.getElementById("reload"); if(r) r.onclick=load;
-  Array.prototype.forEach.call(document.querySelectorAll("button.whsave"),function(b){
-    b.onclick=function(){
-      var slug=b.getAttribute("data-slug");
-      var inp=document.getElementById("wh-"+slug);
-      var v=inp?inp.value.trim():"";
-      if(v&&v.indexOf("https://hook.")!==0){alert("Das sieht nicht nach einer Make-Webhook-Adresse aus (muss mit https://hook. beginnen).");return;}
-      whSet(slug,v);
-      alert(v?"Gespeichert ✓":"Adresse entfernt.");
-      render();
-    };
-  });
+  var ws=document.getElementById("whallsave");
+  if(ws) ws.onclick=function(){
+    var inp=document.getElementById("whall");
+    var v=inp?inp.value.trim():"";
+    if(v&&v.indexOf("https://hook.")!==0){alert("Das sieht nicht nach einer Make-Webhook-Adresse aus (muss mit https://hook. beginnen).");return;}
+    whSet(v);
+    alert(v?"Gespeichert ✓":"Adresse entfernt.");
+    render();
+  };
   Array.prototype.forEach.call(document.querySelectorAll("button.go[data-id]"),function(b){
     b.onclick=function(){
       var id=b.getAttribute("data-id"), slug=b.getAttribute("data-slug");

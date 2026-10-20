@@ -11,6 +11,12 @@
    "name": "Herr Petersen",
    "objekt": "Eppendorfer Weg 12 · 3-Zi Altbau",
    "code": "eppendorf"
+  },
+  {
+   "slug": "unklar",
+   "name": "Nicht zugeordnet",
+   "objekt": "Sammelbecken für unklare Anfragen",
+   "code": ""
   }
  ]
 }
