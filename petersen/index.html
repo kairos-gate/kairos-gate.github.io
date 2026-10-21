@@ -99,7 +99,7 @@ footer{margin-top:38px; padding-top:16px; border-top:1px solid var(--line); colo
 .gatefoot{margin-top:18px; font-size:.74rem; color:var(--muted)}
 </style></head><body><div id="app"></div>
 <script type="application/json" id="state">
-{"savedAt": 1792506543412, "settings": {"code": "eppendorf", "limit": 3, "brand": "Anfragen-Assistent", "kunde": "Herr Petersen", "minProAnfrage": 3}, "objekte": [{"id": "o1", "name": "Eppendorfer Weg 12 · 3-Zi Altbau", "miete": 1850, "moebl": "unmöbliert", "ab": "", "dauer": "min. 24 Monate", "refImmowelt": "", "refScout": "", "krit": "Vollständige Unterlagen, tragfähiges Einkommen, Einzug zeitnah, max. 3 Personen", "status": "aktiv"}], "anfragen": []}
+{"savedAt": 1792509300000, "settings": {"code": "eppendorf", "abo": "pro", "limit": 3, "brand": "Anfragen-Assistent", "kunde": "Herr Petersen", "minProAnfrage": 3}, "objekte": [{"id": "o1", "name": "Eppendorfer Weg 12 · 3-Zi Altbau", "miete": 1850, "moebl": "unmöbliert", "ab": "", "dauer": "min. 24 Monate", "refImmowelt": "", "refScout": "", "krit": "Vollständige Unterlagen, tragfähiges Einkommen, Einzug zeitnah, max. 3 Personen", "status": "aktiv"}], "anfragen": []}
 </script>
 <script id="appcode">
 (function(){
@@ -295,11 +295,11 @@ function render(){
       +'<div><label>Objekt-ID ImmoScout</label><input id="of-refs" placeholder="z. B. 170398082"></div>'
       +'<div class="full"><label>Woran erkennen Sie hier einen Top-Kandidaten? *</label><textarea id="of-krit" required placeholder="z. B. vollständige Unterlagen, Einkommen ab 4.500 €, Einzug bis 01.11., keine WG"></textarea></div>'
       +'<div class="full" style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-a="cancelObj">Abbrechen</button><button class="btn primary" type="submit">Objekt live schalten</button></div>'
-      +'<div class="full limitnote">Über Ref.-Nr. und Objekt-ID ordnet das System eingehende Anfragen automatisch diesem Objekt zu. Die Kriterien steuern die Einstufung ab der ersten Anfrage.</div>'
+      +'<div class="full limitnote">Über Ref.-Nr. und Objekt-ID ordnet das System eingehende Anfragen automatisch diesem Objekt zu. Die Kriterien steuern die Einstufung ab der ersten Anfrage. Bitte melden Sie neue Objekte auch Ihrem Assistenten, damit die automatische Zuordnung sie kennt.</div>'
       +'</form>'
     : '<div style="margin-top:14px"><button class="btn primary" data-a="addObj" '+(limitFull?"disabled":"")+'>+ Objekt hinzufügen</button></div>';
   document.getElementById("app").innerHTML=
-    '<div class="top"><div><h1>Makler-Cockpit</h1><div class="sub">'+(function(){var h=new Date().getHours();var g=h<11?"Guten Morgen":h<18?"Guten Tag":"Guten Abend";return state.settings.kunde?g+", "+esc(state.settings.kunde):esc(state.settings.brand);})()+'</div></div><div style="text-align:right"><div class="sub">'+actObjs.length+' von '+state.settings.limit+' Objekten aktiv</div><div class="savechip" id="savechip">'+chipTxt()+'</div></div></div>'
+    '<div class="top"><div><h1>Makler-Cockpit</h1><div class="sub">'+(function(){var h=new Date().getHours();var g=h<11?"Guten Morgen":h<18?"Guten Tag":"Guten Abend";return state.settings.kunde?g+", "+esc(state.settings.kunde):esc(state.settings.brand);})()+'</div></div><div style="text-align:right"><div class="sub">'+(state.settings.abo?("Paket "+state.settings.abo.charAt(0).toUpperCase()+state.settings.abo.slice(1)+" · "):"")+actObjs.length+' von '+state.settings.limit+' Objekten aktiv</div><div class="savechip" id="savechip">'+chipTxt()+'</div></div></div>'
     +'<div class="statusline"><span><b>'+total.length+'</b> Anfragen</span><span><b>'+bereit+'</b> geprüft &amp; bereit</span><span><b>'+pruef+'</b> in Qualitätsprüfung</span><span style="margin-left:auto"><button class="btn small" data-a="logout">Abmelden</button></span></div>'
     +'<div class="chips">'+chips1+'</div>'
     +'<div class="chips second">'+chips2+'</div>'
@@ -316,7 +316,7 @@ function render(){
     +'</div>'
     +'<div class="card inbox" style="margin-bottom:26px"><h2>Posteingang — vorsortiert</h2>'+list+'</div>'
     +'<div class="card"><h2>Ihre Objekte</h2><div class="objgrid">'+objCards+'</div>'+addForm
-    +'<div class="limitnote">Ihr Paket umfasst '+state.settings.limit+' aktive Objekte'+(limitFull?' — Limit erreicht. Für weitere Objekte sprechen Sie Ihren Assistenten an.':'.')+'</div></div>'
+    +'<div class="limitnote">Ihr'+(state.settings.abo?(" "+state.settings.abo.charAt(0).toUpperCase()+state.settings.abo.slice(1)+"-"):" ")+'Paket umfasst '+state.settings.limit+' aktive Objekte'+(limitFull?' — Limit erreicht. Für weitere Objekte sprechen Sie Ihren Assistenten an.':'.')+'</div></div>'
     +'<footer>Es wird nichts versendet, was Sie nicht freigegeben haben. „Antwort senden“ öffnet Ihr Mail-Programm — Absenderin bleiben Sie. · '+esc(state.settings.brand)+'</footer>';
 }
 
