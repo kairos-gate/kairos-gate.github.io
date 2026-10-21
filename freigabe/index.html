@@ -65,6 +65,9 @@ ol.note li{margin:6px 0}
 .steps .ok{color:var(--green);font-weight:600}
 .steps .err{color:var(--c);font-weight:600}
 .result-ok{background:#EAF3EE;border:1px solid #CBE2D5;border-radius:10px;padding:12px 14px;font-size:.85rem;margin-top:10px;line-height:1.6}
+.danger{background:#A8463A;color:#fff;font-weight:700;width:100%}
+.vwrow{display:flex;gap:8px;margin-top:8px}
+.vwrow .go,.vwrow .danger{flex:1;font-size:.85rem;padding:10px 12px;border-radius:10px}
 </style>
 </head>
 <body>
@@ -168,6 +171,88 @@ function neuerKunde(f){
     if(btn){btn.disabled=false;btn.textContent="\ud83c\udfd7\ufe0f Kunde anlegen";}
   });
 }
+function vwStep(slug,txt,cls){try{var b=document.getElementById("vw-steps-"+slug);if(b){b.style.display="block";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=txt;b.appendChild(d);}}catch(e){}}
+function patchCockpit(slug,nm,cd,objName){
+  return ghGet(slug+"/index.html").then(function(ex){
+    if(!ex||!ex.content) throw new Error("Cockpit-Datei nicht gefunden");
+    var html=utf8b64(ex.content);
+    var m=html.match(/(<script type="application\/json" id="state">\n)([\s\S]*?)(\n<\/script>)/);
+    if(!m) throw new Error("Cockpit-Aufbau unerwartet");
+    var st=JSON.parse(m[2]);
+    st.settings.kunde=nm; st.settings.code=cd;
+    if(st.objekte&&st.objekte[0]) st.objekte[0].name=objName;
+    st.savedAt=Date.now();
+    html=html.replace(m[0], m[1]+JSON.stringify(st)+m[3]);
+    html=html.replace(/<title>[^<]*<\/title>/,"<title>Makler-Cockpit \u00b7 "+nm+"</title>");
+    return ghPut(slug+"/index.html", b64utf8(html), "Kunde "+slug+": Daten bearbeitet");
+  });
+}
+function kundenlisteSchreiben(aender,msg){
+  return ghGet("freigabe/kunden.json").then(function(ex){
+    var liste={kunden:[]};
+    if(ex&&ex.content){try{liste=JSON.parse(utf8b64(ex.content));}catch(e){}}
+    if(!liste.kunden)liste.kunden=[];
+    liste=aender(liste);
+    var body={message:msg,content:b64utf8(JSON.stringify(liste,null,1))};
+    if(ex&&ex.sha)body.sha=ex.sha;
+    return fetch(GH_API+"freigabe/kunden.json",{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("GitHub-Fehler "+r.status+" bei der Kundenliste");});
+  });
+}
+function kundeSpeichern(ku,f,btn){
+  if(btn){btn.disabled=true;btn.textContent="Speichere\u2026";}
+  vwStep(ku.slug,"Cockpit wird angepasst\u2026");
+  patchCockpit(ku.slug,f.name,f.code,f.objekt).then(function(){
+    vwStep(ku.slug,"Cockpit angepasst \u2713","ok");
+    return kundenlisteSchreiben(function(liste){
+      liste.kunden.forEach(function(k){if(k.slug===ku.slug){k.name=f.name;k.code=f.code;k.objekt=f.objekt;}});
+      return liste;
+    },"Kunde "+ku.slug+": Kundenliste aktualisiert");
+  }).then(function(){
+    vwStep(ku.slug,"Kundenliste aktualisiert \u2713","ok");
+    ku.name=f.name;ku.code=f.code;ku.objekt=f.objekt;
+    nkNeu.forEach(function(e){if(e.slug===ku.slug){e.name=f.name;e.code=f.code;e.objekt=f.objekt;}});
+    alert("Gespeichert \u2713\n\nWichtig: Sag Claude im Chat \u201eKunde "+f.name+" wurde ge\u00e4ndert\u201c, damit auch die KI-Zuordnung die neuen Daten kennt. Der neue Zugangscode gilt, sobald das Cockpit das n\u00e4chste Mal geladen wird.");
+    render();
+  })["catch"](function(err){
+    vwStep(ku.slug,"Abbruch: "+err.message,"err");
+    if(btn){btn.disabled=false;btn.textContent="Speichern";}
+  });
+}
+function kundeLoeschen(ku,btn){
+  if(!confirm("Kunde \u201e"+ku.name+"\u201c wirklich endg\u00fcltig l\u00f6schen?\n\nDas Cockpit und ALLE zugeh\u00f6rigen Anfragen werden aus dem System entfernt. Das kann nicht r\u00fcckg\u00e4ngig gemacht werden."))return;
+  var tippe=prompt("Zur Best\u00e4tigung bitte die Kennung des Kunden eintippen:");
+  if(tippe===null)return;
+  if(String(tippe).trim().toLowerCase()!==ku.slug){alert("Das war nicht die Kennung \u201e"+ku.slug+"\u201c \u2014 es wurde nichts gel\u00f6scht.");return;}
+  if(btn){btn.disabled=true;btn.textContent="L\u00f6sche\u2026";}
+  vwStep(ku.slug,"Dateien werden ermittelt\u2026");
+  ghGet(ku.slug).then(function(liste){
+    if(!liste||!liste.length) return [];
+    return liste;
+  }).then(function(dateien){
+    var kette=Promise.resolve();
+    dateien.forEach(function(d){
+      kette=kette.then(function(){
+        return fetch(GH_API+d.path,{method:"DELETE",headers:ghHeaders(),body:JSON.stringify({message:"Kunde "+ku.slug+" gel\u00f6scht: "+d.name,sha:d.sha})}).then(function(r){if(!r.ok)throw new Error("GitHub-Fehler "+r.status+" beim L\u00f6schen von "+d.name);});
+      }).then(function(){vwStep(ku.slug,d.name+" entfernt \u2713","ok");});
+    });
+    return kette;
+  }).then(function(){
+    return kundenlisteSchreiben(function(liste){
+      liste.kunden=liste.kunden.filter(function(k){return k.slug!==ku.slug;});
+      return liste;
+    },"Kunde "+ku.slug+" aus Kundenliste entfernt");
+  }).then(function(){
+    state.kunden=state.kunden.filter(function(k){return k.slug!==ku.slug;});
+    for(var i=nkNeu.length-1;i>=0;i--){if(nkNeu[i].slug===ku.slug)nkNeu.splice(i,1);}
+    try{delete state.per[ku.slug];}catch(e){}
+    alert("Kunde \u201e"+ku.name+"\u201c wurde gel\u00f6scht.\n\nLetzter Schritt: Sag Claude im Chat \u201eKunde "+ku.name+" ist gel\u00f6scht\u201c, damit die KI-Zuordnung ihn vergisst.");
+    render();
+  })["catch"](function(err){
+    vwStep(ku.slug,"Abbruch: "+err.message,"err");
+    vwStep(ku.slug,"Du kannst es einfach nochmal versuchen \u2014 bereits Gel\u00f6schtes bleibt gel\u00f6scht, der Rest wird erneut angegangen.");
+    if(btn){btn.disabled=false;btn.textContent="Kunde endg\u00fcltig l\u00f6schen";}
+  });
+}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
 function jget(url){return fetch(url,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});}
 
@@ -223,12 +308,29 @@ function kundeCard(ku){
     ? '<p class="note" style="margin-top:10px">Hier landen Anfragen, die die KI keinem Kunden sicher zuordnen konnte. Zum Klären: Original-Mail mit eindeutigem Objektnamen erneut an den Briefkasten senden.</p>'
     : '<div class="kfoot"><a class="linkbtn" href="'+esc(PAGES+ku.slug+"/")+'" target="_blank" rel="noopener">Cockpit öffnen ↗</a>'
       +'<span class="codeline">Zugang: <b>'+esc(ku.code||"–")+'</b></span></div>';
+  var verwalten='';
+  if(ku.slug!=="unklar"&&ghTokenGet()){
+    var delTeil = ku.slug==="petersen"
+      ? '<p class="note">Dieser Kunde ist die Bau-Vorlage f\u00fcr neue Kunden und kann nicht gel\u00f6scht werden.</p>'
+      : '<p></p><button class="danger kd-del" data-slug="'+esc(ku.slug)+'">Kunde endg\u00fcltig l\u00f6schen</button>';
+    verwalten='<details><summary>\u2699\ufe0f Verwalten</summary>'
+      +'<div class="nkform vwform">'
+      +'<label>Kundenname</label><input id="ed-name-'+esc(ku.slug)+'" value="'+esc(ku.name)+'">'
+      +'<div class="nkrow2"><div><label>Cockpit-Zugangscode</label><input id="ed-code-'+esc(ku.slug)+'" value="'+esc(ku.code||"")+'"></div>'
+      +'<div><label>Objekt-Bezeichnung</label><input id="ed-obj-'+esc(ku.slug)+'" value="'+esc(ku.objekt)+'"></div></div>'
+      +'<button class="go edit-save" data-slug="'+esc(ku.slug)+'">Speichern</button>'
+      +'</div>'
+      +delTeil
+      +'<div class="steps" id="vw-steps-'+esc(ku.slug)+'"></div>'
+      +'</details>';
+  }
   return '<div class="card">'
     +'<div class="kname">'+esc(ku.name)+'</div>'
     +'<div class="kobj">'+esc(ku.objekt)+'</div>'
     +'<div class="knums"><span class="num o">'+offen+'</span><span class="numlabel">zu entscheiden</span>'
     +'<span class="num g">'+p.live.length+'</span><span class="numlabel">im Cockpit</span></div>'
     +foot
+    +verwalten
     +'</div>';
 }
 
@@ -278,7 +380,7 @@ function render(){
     document.getElementById("gc").addEventListener("keydown",function(e){if(e.key==="Enter")tryGate();});
     return;
   }
-  var h='<header><div><h1>Kairos Zentrale</h1><div class="sub">Dein Arbeitsplatz · Kunden & Freigaben</div></div>'
+  var h='<header><div><h1>Kairos Zentrale</h1><div class="sub">Dein Arbeitsplatz · Kunden &amp; Freigaben</div></div>'
     +'<div class="topbtns"><button class="ghost" id="reload">↻ Aktualisieren</button></div></header>';
   if(state.loading){ el.innerHTML=h+'<div class="empty">Lade Daten…</div>'; bind(); return; }
 
@@ -301,7 +403,7 @@ function render(){
   done.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
 
   h+='<p class="sect">Zu entscheiden ('+openCnt+')</p>';
-  if(!open.length){ h+='<div class="empty">Nichts offen — alles entschieden.<br>Neue eingestufte Anfragen erscheinen hier automatisch.</div>'; }
+  if(!open.length){ h+='<div class="empty">Nichts offen — alles entschieden.<br>Neue eingestufte Anfragen erscheinen hier automatisch.</div>; }
   open.forEach(function(x){ h+=cardHtml(x.ku,x.a,x.st); });
 
   if(done.length){
@@ -316,7 +418,7 @@ function render(){
     +'<p class="note" style="margin-top:18px"><b>GitHub-Schl\u00fcssel</b> \u2014 nur n\u00f6tig, damit die Zentrale neue Kunden selbst anlegen kann ('+(ghTokenGet()?'hinterlegt \u2713':'noch nicht hinterlegt')+'). Er wird nur auf diesem Ger\u00e4t gespeichert.</p>'
     +'<input id="ghtok" type="password" placeholder="github_pat_\u2026" value="'+esc(ghTokenGet())+'">'
     +'<p></p><button class="go" id="ghtoksave">Schl\u00fcssel speichern</button></details></div>';
-  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 3.1</p>';
+  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 3.2</p>';
   el.innerHTML=h; bind();
 }
 
@@ -340,6 +442,29 @@ function bind(){
     alert(v?"Schl\u00fcssel gespeichert \u2713":"Schl\u00fcssel entfernt.");
     render();
   };
+  Array.prototype.forEach.call(document.querySelectorAll("button.edit-save"),function(b){
+    b.onclick=function(){
+      var slug=b.getAttribute("data-slug");
+      var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+      if(!ku)return;
+      function v(id){var e=document.getElementById(id);return e?clean(e.value):"";}
+      var f={name:v("ed-name-"+slug),code:(document.getElementById("ed-code-"+slug)?document.getElementById("ed-code-"+slug).value.trim().toLowerCase():""),objekt:v("ed-obj-"+slug)};
+      if(!/^[^<>&"]{2,40}$/.test(f.name)){alert("Bitte einen g\u00fcltigen Kundennamen eingeben (2\u201340 Zeichen, ohne < > &).");return;}
+      if(!/^[a-z\u00e4\u00f6\u00fc\u00df0-9-]{4,24}$/.test(f.code)){alert("Der Zugangscode braucht 4\u201324 Zeichen (Kleinbuchstaben/Zahlen).");return;}
+      if(!/^[^<>&"]{3,80}$/.test(f.objekt)){alert("Bitte eine g\u00fcltige Objekt-Bezeichnung eingeben (3\u201380 Zeichen, ohne < > &).");return;}
+      var sb=document.getElementById("vw-steps-"+slug); if(sb){sb.innerHTML="";}
+      kundeSpeichern(ku,f,b);
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("button.kd-del"),function(b){
+    b.onclick=function(){
+      var slug=b.getAttribute("data-slug");
+      var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+      if(!ku)return;
+      var sb=document.getElementById("vw-steps-"+slug); if(sb){sb.innerHTML="";}
+      kundeLoeschen(ku,b);
+    };
+  });
   var nn=document.getElementById("nk-name");
   if(nn) nn.oninput=function(){var s=document.getElementById("nk-slug");if(s&&!s.getAttribute("data-touched"))s.value=slugVorschlag(nn.value);};
   var ns=document.getElementById("nk-slug");
