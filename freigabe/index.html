@@ -124,7 +124,7 @@ function neuerKunde(f){
     html=html.split("mc-state-petersen").join("mc-state-"+f.slug).split("mc-auth-petersen").join("mc-auth-"+f.slug);
     html=html.replace(/<title>[^<]*<\/title>/,"<title>Makler-Cockpit \u00b7 "+f.name+"</title>");
     var sw=tpl.sw.split("cockpit-petersen-v1").join("cockpit-"+f.slug+"-v1");
-    var mf; try{mf=JSON.parse(tpl.mf);}catch(e){mf={start_url:"./",scope:"./",display:"standalone",background_color:"#F5F0E6",theme_color:"#0C5F45",icons:[{src:"icon-192.png",sizes:"192x192",type:"image/png"},{src:"icon-512.png",sizes:"512x512",type:"image/png",purpose:"any maskable"}]};}
+    var mf; try{mf=JSON.parse(tpl.mf);}catch(e){mf={start_url:"./",scope:"./",display:"standalone",background_color:"#F5F0E6",theme_color:"#0C5F45",icons:[{src:"icon-192.png",sizes:"192x192",type:"image/png"},{src:"icon-512.png",sizes:"512x512",type:"image/png","purpose":"any maskable"}]};}
     mf.name="Cockpit "+f.name; mf.short_name=f.slug.charAt(0).toUpperCase()+f.slug.slice(1);
     var msg="Neuer Kunde "+f.slug;
     var dateien=[
@@ -380,7 +380,7 @@ function render(){
     document.getElementById("gc").addEventListener("keydown",function(e){if(e.key==="Enter")tryGate();});
     return;
   }
-  var h='<header><div><h1>Kairos Zentrale</h1><div class="sub">Dein Arbeitsplatz · Kunden &amp; Freigaben</div></div>'
+  var h='<header><div><h1>Kairos Zentrale</h1><div class="sub">Dein Arbeitsplatz · Kunden & Freigaben</div></div>'
     +'<div class="topbtns"><button class="ghost" id="reload">↻ Aktualisieren</button></div></header>';
   if(state.loading){ el.innerHTML=h+'<div class="empty">Lade Daten…</div>'; bind(); return; }
 
@@ -403,7 +403,7 @@ function render(){
   done.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
 
   h+='<p class="sect">Zu entscheiden ('+openCnt+')</p>';
-  if(!open.length){ h+='<div class="empty">Nichts offen — alles entschieden.<br>Neue eingestufte Anfragen erscheinen hier automatisch.</div>; }
+  if(!open.length){ h+='<div class="empty">Nichts offen — alles entschieden.<br>Neue eingestufte Anfragen erscheinen hier automatisch.</div>'; }
   open.forEach(function(x){ h+=cardHtml(x.ku,x.a,x.st); });
 
   if(done.length){
@@ -492,10 +492,12 @@ function bind(){
       if(!ku) return;
       var p=state.per[slug]||{pending:[]};
       var a=p.pending.filter(function(x){return String(x.id)===String(id);})[0];
-      if(a) freigeben(ku,a,b);
+      if(a) freigeben(ku,a,btn_null(b));
     };
   });
 }
+
+function btn_null(b){return b;}
 
 function tryGate(){
   var v=document.getElementById("gc").value.trim();
