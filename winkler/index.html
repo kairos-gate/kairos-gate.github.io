@@ -98,4 +98,99 @@ footer{margin-top:38px; padding-top:16px; border-top:1px solid var(--line); colo
 .gatefoot{margin-top:18px; font-size:.74rem; color:var(--muted)}
 </style></head><body><div id="app"></div>
 <script type="application/json" id="state">
-{"savedAt": 1792600000000, "settings": {"abo": "pro", "limit": 3, "brand": "Anfragen-Assistent", "kunde": "Frau Winkler", "minProAnfrage": 3}, "objekte": [{"id": "o1", "name": "Privatstrasse Am Rothenbaum · 2-Zi möbliert", "miete": 1500, "moebl": "möbliert", "ab": "", "dauer": "min. 12 Monate", "refImmowelt": "3513-03", "refScou
+{"savedAt": 1792600000000, "settings": {"abo": "pro", "limit": 3, "brand": "Anfragen-Assistent", "kunde": "Frau Winkler", "minProAnfrage": 3}, "objekte": [{"id": "o1", "name": "Privatstrasse Am Rothenbaum · 2-Zi möbliert", "miete": 1500, "moebl": "möbliert", "ab": "", "dauer": "min. 12 Monate", "refImmowelt": "3513-03", "refScout": "170398081", "krit": "Vollständige Unterlagen, tragfähiges Einkommen, Einzug zeitnah, max. 2 Personen", "status": "aktiv"}]}
+</script>
+<script id="appcode">
+(function(){
+"use strict";
+var FONTLINK='';
+var SUPA_URL="https://lgnqaazysivdepbsgayt.supabase.co", SUPA_ANON="sb_publishable_jexkPxbb1hCLdyhmkrRrow_WuSMvk46", SLUG="winkler";
+var state=null, embeddedSavedAt=0, cap=null, capKnown=false, pubTimer=null, retried=false, saveMode="init";
+var ui={objF:"alle", stufeF:"alle", openId:null, authed:false, addObj:false, sentHint:null};
+var zugang="", syncTimer=null, pendingRender=false, terminTimer={};
+function rpc(fn,args){
+  if(!SUPA_URL) return Promise.reject(new Error("offline"));
+  var H={"Content-Type":"application/json","apikey":SUPA_ANON};
+  if(SUPA_ANON.indexOf("eyJ")===0){H["Authorization"]="Bearer "+SUPA_ANON;}
+  return fetch(SUPA_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:H,
+    body:JSON.stringify(args)}).then(function(r){return r.json();});
+}
+function abmelden(){zugang=""; ui.authed=false; try{localStorage.removeItem("mc4-code-"+SLUG);}catch(e){} render();}
+function tipptGerade(){var a=document.activeElement; return !!(a&&a.closest&&a.closest("#app")&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));}
+function syncNow(){
+  if(!ui.authed||!zugang) return;
+  rpc("cockpit_lesen",{p_slug:SLUG,p_code:zugang}).then(function(d){
+    if(!d||d.ok!==true){ if(d&&d.grund==="code"){abmelden();} return; }
+    state.anfragen=(d.anfragen||[]);
+    try{persistLocal();}catch(e){}
+    if(tipptGerade()){pendingRender=true;} else {render();}
+  }).catch(function(){});
+}
+document.addEventListener("focusout",function(){ if(pendingRender){pendingRender=false; setTimeout(render,150);} });
+
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function uid(){return "o"+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);}
+function objById(id){for(var i=0;i<state.objekte.length;i++) if(state.objekte[i].id===id) return state.objekte[i]; return null;}
+function draftOf(a){var t=String(a.termin||"").trim(); return t? a.entwurf.split("{TERMIN}").join(t) : a.entwurf.split("{TERMIN}").join("[TERMIN EINFÜGEN]");}
+document.addEventListener("input",function(ev){
+  var el=(ev.target&&ev.target.closest)?ev.target.closest("[data-termin]"):null; if(!el)return;
+  var id=String(el.getAttribute("data-termin"));
+  var a=state.anfragen.find(function(x){return String(x.id)===id;}); if(!a)return;
+  a.termin=el.value; state.savedAt=Date.now();
+  try{persistLocal();}catch(e){}
+  var d=document.querySelector('[data-draft="'+id+'"]'); if(d) d.textContent=draftOf(a);
+  clearTimeout(terminTimer[id]);
+  terminTimer[id]=setTimeout(function(){
+    rpc("cockpit_schreiben",{p_slug:SLUG,p_code:zugang,p_id:id,p_patch:{termin:a.termin}}).catch(function(){});
+  },900);
+});
+function fmtTs(ts){
+  if(ts.indexOf("T")<0){var p=ts.split("-");return p[2]+"."+p[1]+".";}
+  var d=new Date(ts);return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+}
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function rows(){
+  return state.anfragen.filter(function(a){
+    var o=objById(a.obj);
+    var objOk = ui.objF==="alle" ? (o && o.status==="aktiv") : a.obj===ui.objF;
+    var stOk = ui.stufeF==="alle" || a.stufe===ui.stufeF;
+    return objOk && stOk && a.astatus==="bereit";
+  });
+}
+
+/* ---- Persistenz (Seite speichert sich selbst) ---- */
+function persistLocal(){try{localStorage.setItem("mc4-state-"+SLUG,JSON.stringify(state));}catch(e){}}
+function commit(){state.savedAt=Date.now(); persistLocal(); render(); schedulePublish();}
+function buildDoc(){
+  var css=document.getElementById("appcss").textContent;
+  var code=document.getElementById("appcode").textContent;
+  var json=JSON.stringify({savedAt:state.savedAt,settings:state.settings,objekte:state.objekte}).replace(/</g,"\\u003c");
+  return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Makler-Cockpit · Winkler</title>'
+    +FONTLINK+'<style id="appcss">'+css+'</style></head><body><div id="app"></div>'
+    +'<script type="application/json" id="state">'+json+'<\/script>'
+    +'<script id="appcode">'+code+'<\/script></body></html>';
+}
+function schedulePublish(){
+  if(!cap){ if(capKnown){saveMode="local"; updateChip();} return; }
+  saveMode="saving"; updateChip();
+  clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1600);
+}
+function doPublish(){
+  cap.publish(buildDoc()).then(function(){retried=false; saveMode="saved"; updateChip();}).catch(function(e){
+    var c=e&&e.code;
+    if(c==="conflict"){return;}
+    if(c==="rate_limited"){clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,5000); return;}
+    if(c==="upstream_error"&&!retried){retried=true; clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1500+Math.random()*1500); return;}
+    retried=false;
+    if(c==="not_granted"||c==="not_writer"||c==="not_declared"||c==="capability_disabled"||c==="capability_removed"){cap=null; saveMode="viewer";}
+    else{saveMode="local";}
+    updateChip();
+  });
+}
+function chipTxt(){
+  if(saveMode==="saving")return "Speichert…";
+  if(saveMode==="saved")return "Gespeichert";
+  if(saveMode==="viewer")return "Ansichtsmodus — Änderungen gehen an Ihren Assistenten";
+  if(saveMode==="lokal")return "Lokal gespeichert";
+  return "";
+}
