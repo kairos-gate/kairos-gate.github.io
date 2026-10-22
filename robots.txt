@@ -1,0 +1,3 @@
+# Kairos - interne Testphase, bitte nicht indexieren
+User-agent: *
+Disallow: /
