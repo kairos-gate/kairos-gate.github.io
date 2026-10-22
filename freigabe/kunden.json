@@ -4,21 +4,18 @@
    "slug": "winkler",
    "name": "Frau Winkler",
    "objekt": "Privatstrasse Am Rothenbaum · 2-Zi möbliert",
-   "code": "rothenbaum",
    "abo": "pro"
   },
   {
    "slug": "petersen",
    "name": "Herr Petersen",
    "objekt": "Eppendorfer Weg 12 · 3-Zi Altbau",
-   "code": "eppendorf",
    "abo": "pro"
   },
   {
    "slug": "unklar",
    "name": "Nicht zugeordnet",
-   "objekt": "Sammelbecken für unklare Anfragen",
-   "code": ""
+   "objekt": "Sammelbecken für unklare Anfragen"
   }
  ]
 }
