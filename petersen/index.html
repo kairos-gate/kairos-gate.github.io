@@ -328,4 +328,133 @@ function render(){
     +'<div class="chips">'+chips1+'</div>'
     +'<div class="chips second">'+chips2+'</div>'
     +'<div class="kpis">'
-    +'<div class="kpi t"><div c
+    +'<div class="kpi t"><div class="v">\u2248 '+zeitStr+' Std.</div><div class="l">Zeit gespart (gesamt)</div></div>'
+    +'<div class="kpi"><div class="v">'+r.length+'</div><div class="l">Anfragen im Filter</div></div>'
+    +'<div class="kpi a"><div class="v">'+A+'</div><div class="l">A · Einladen</div></div>'
+    +'<div class="kpi b"><div class="v">'+B+'</div><div class="l">B · Nachfragen</div></div>'
+    +'<div class="kpi c"><div class="v">'+C+'</div><div class="l">C · Absagen</div></div>'
+    +'</div>'
+    +'<div class="grid2">'
+    +'<div class="card"><h2>Verlauf der Anfragen</h2>'+lineChart()+'<div class="chnote">Füllt sich im Pilotbetrieb mit jedem Tag weiter.</div></div>'
+    +'<div class="card"><h2>Struktur der Anfragen</h2>'+typChart()+'<div style="height:18px"></div><h2>Objekte im Vergleich</h2>'+objChart()+'</div>'
+    +'</div>'
+    +'<div class="card inbox" style="margin-bottom:26px"><h2>Posteingang — vorsortiert</h2>'+list+'</div>'
+    +'<div class="card"><h2>Ihre Objekte</h2><div class="objgrid">'+objCards+'</div>'+addForm
+    +'<div class="limitnote">Ihr'+(state.settings.abo?(" "+state.settings.abo.charAt(0).toUpperCase()+state.settings.abo.slice(1)+"-"):" ")+'Paket umfasst '+state.settings.limit+' aktive Objekte'+(limitFull?' — Limit erreicht. Für weitere Objekte sprechen Sie Ihren Assistenten an.':'.')+'</div></div>'
+    +'<footer>Es wird nichts versendet, was Sie nicht freigegeben haben. „Antwort senden“ öffnet Ihr Mail-Programm — Absenderin bleiben Sie. · '+esc(state.settings.brand)+' · Cockpit v4</footer>';
+}
+
+/* ---- Events ---- */
+document.addEventListener("submit",function(ev){
+  var f=ev.target;
+  if(f.id==="gateForm"){
+    ev.preventDefault();
+    var v=document.getElementById("gateCode").value.trim();
+    var err=document.getElementById("gateErr");
+    var btn=f.querySelector("button[type=submit]");
+    if(!v){err.textContent="Bitte Zugangscode eingeben."; return;}
+    if(!SUPA_URL){err.textContent="Das System wird gerade umgestellt — bitte später erneut versuchen."; return;}
+    if(btn){btn.disabled=true; btn.textContent="Prüfe…";}
+    rpc("cockpit_login",{p_slug:SLUG,p_code:v}).then(function(d){
+      if(d&&d.ok===true){
+        zugang=v; ui.authed=true;
+        try{localStorage.setItem("mc4-code-"+SLUG,v);}catch(e){}
+        render(); syncNow();
+      } else {
+        err.textContent=(d&&(d.grund==="gesperrt"||d.fehler==="gesperrt"))?"Zu viele Fehlversuche — bitte in 15 Minuten erneut versuchen.":"Code nicht korrekt — bitte erneut versuchen.";
+        if(btn){btn.disabled=false; btn.textContent="Anmelden";}
+      }
+    }).catch(function(){
+      err.textContent="Keine Verbindung — bitte Internet prüfen und erneut versuchen.";
+      if(btn){btn.disabled=false; btn.textContent="Anmelden";}
+    });
+  } else if(f.id==="objForm"){
+    ev.preventDefault();
+    var name=document.getElementById("of-name").value.trim();
+    if(!name) return;
+    var act=state.objekte.filter(function(o){return o.status==="aktiv";}).length;
+    if(act>=state.settings.limit) return;
+    state.objekte.push({id:uid(), name:name,
+      miete:Number(document.getElementById("of-miete").value)||0,
+      moebl:document.getElementById("of-moebl").value,
+      ab:document.getElementById("of-ab").value,
+      dauer:document.getElementById("of-dauer").value.trim(),
+      refImmowelt:document.getElementById("of-refi").value.trim(),
+      refScout:document.getElementById("of-refs").value.trim(),
+      krit:document.getElementById("of-krit").value.trim(),
+      status:"aktiv"});
+    ui.addObj=false; commit();
+  }
+});
+document.addEventListener("click",function(ev){
+  if(ev.target&&ev.target.closest&&ev.target.closest(".terminput")) return;
+  var el;
+  if(el=ev.target.closest("[data-of]")){ui.objF=el.getAttribute("data-of"); ui.openId=null; render(); return;}
+  if(el=ev.target.closest("[data-sf]")){ui.stufeF=el.getAttribute("data-sf"); ui.openId=null; render(); return;}
+  if(el=ev.target.closest("[data-copy]")){
+    var id=String(el.getAttribute("data-copy"));
+    var a=state.anfragen.find(function(x){return String(x.id)===id;});
+    if(a&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(draftOf(a));}
+    el.textContent="Kopiert ✓"; setTimeout(function(){try{el.textContent="Kopieren";}catch(e){}},1400);
+    ev.stopPropagation(); return;
+  }
+  if(el=ev.target.closest("[data-send]")){
+    var idS=String(el.getAttribute("data-send"));
+    var aS=state.anfragen.find(function(x){return String(x.id)===idS;});
+    if(aS){
+      if(aS.entwurf.indexOf("{TERMIN}")>=0&&!String(aS.termin||"").trim()){
+        var ti=document.querySelector('[data-termin="'+idS+'"]');
+        if(ti){ti.focus();ti.style.borderColor="#A8463A";setTimeout(function(){try{ti.style.borderColor="";}catch(e){}},1600);}
+        ev.stopPropagation(); return;
+      }
+      var oS=objById(aS.obj), txt=draftOf(aS);
+      try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt);}catch(e){}
+      ui.sentHint=idS; render();
+      if(aS.antwort_weg!=="portal"){try{window.location.href='mailto:'+encodeURIComponent(aS.antwort_an||'')+'?subject='+encodeURIComponent('Ihre Anfrage — '+(oS?oS.name:""))+'&body='+encodeURIComponent(txt);}catch(e){}}
+    }
+    ev.stopPropagation(); return;
+  }
+  if(el=ev.target.closest("[data-vermietet]")){var o=objById(el.getAttribute("data-vermietet")); if(o){o.status="vermietet"; if(ui.objF===o.id)ui.objF="alle"; commit();} return;}
+  if(el=ev.target.closest("[data-reaktiv]")){
+    var o2=objById(el.getAttribute("data-reaktiv"));
+    var act=state.objekte.filter(function(x){return x.status==="aktiv";}).length;
+    if(o2){ if(act>=state.settings.limit){alert("Objekt-Limit erreicht — bitte zuerst ein Objekt als vermietet markieren oder das Paket erweitern.");} else {o2.status="aktiv"; commit();} }
+    return;
+  }
+  if(el=ev.target.closest("[data-a]")){
+    var a=el.getAttribute("data-a");
+    if(a==="addObj"){ui.addObj=true; render();}
+    else if(a==="cancelObj"){ui.addObj=false; render();}
+    else if(a==="logout"){abmelden();}
+    return;
+  }
+  var row=ev.target.closest(".row[data-id]");
+  if(row){var id2=String(row.getAttribute("data-id")); ui.openId=(ui.openId===id2?null:id2); render();}
+});
+
+/* ---- Boot ---- */
+(function boot(){
+  try{state=JSON.parse(document.getElementById("state").textContent);}catch(e){state=null;}
+  if(!state||!state.settings){state={savedAt:1,settings:{limit:3,brand:"Anfragen-Assistent"},objekte:[]};}
+  embeddedSavedAt=state.savedAt||1;
+  try{var loc=JSON.parse(localStorage.getItem("mc4-state-"+SLUG)||"null"); if(loc&&loc.savedAt>embeddedSavedAt){state=loc;}}catch(e){}
+  if(!state.anfragen){state.anfragen=[];}
+  try{zugang=localStorage.getItem("mc4-code-"+SLUG)||"";}catch(e){}
+  ui.authed=!!zugang;
+  render();
+  /* ---- Pipeline-Sync: freigegebene Anfragen vom gesicherten Server laden ---- */
+  syncNow();
+  syncTimer=setInterval(syncNow,90000);
+  var useFn=(typeof claude!=="undefined"&&claude&&claude.use)?claude.use:null;
+  if(useFn){
+    useFn("artifact").then(function(a){
+      cap=a; capKnown=true;
+      if(saveMode==="init"||saveMode==="local"){saveMode=a?"saved":"viewer";}
+      updateChip();
+      if(a&&state.savedAt>embeddedSavedAt){schedulePublish();}
+    });
+  } else {capKnown=true; saveMode="local"; updateChip();}
+})();
+})();
+</script>
+<script>if("serviceWorker" in navigator){addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(){})})}</script></body></html>
