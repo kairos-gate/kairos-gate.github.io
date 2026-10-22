@@ -1,4 +1,4 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0C5F45"><link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Cockpit"><title>Makler-Cockpit · Petersen</title>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0C5F45"><link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Cockpit"><title>Makler-Cockpit · Petersen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style id="appcss">
 :root{
@@ -99,14 +99,35 @@ footer{margin-top:38px; padding-top:16px; border-top:1px solid var(--line); colo
 .gatefoot{margin-top:18px; font-size:.74rem; color:var(--muted)}
 </style></head><body><div id="app"></div>
 <script type="application/json" id="state">
-{"savedAt": 1792509300000, "settings": {"code": "eppendorf", "abo": "pro", "limit": 3, "brand": "Anfragen-Assistent", "kunde": "Herr Petersen", "minProAnfrage": 3}, "objekte": [{"id": "o1", "name": "Eppendorfer Weg 12 · 3-Zi Altbau", "miete": 1850, "moebl": "unmöbliert", "ab": "", "dauer": "min. 24 Monate", "refImmowelt": "", "refScout": "", "krit": "Vollständige Unterlagen, tragfähiges Einkommen, Einzug zeitnah, max. 3 Personen", "status": "aktiv"}], "anfragen": []}
+{"savedAt": 1792600000000, "settings": {"abo": "pro", "limit": 3, "brand": "Anfragen-Assistent", "kunde": "Herr Petersen", "minProAnfrage": 3}, "objekte": [{"id": "o1", "name": "Eppendorfer Weg 12 · 3-Zi Altbau", "miete": 1850, "moebl": "unmöbliert", "ab": "", "dauer": "min. 24 Monate", "refImmowelt": "", "refScout": "", "krit": "Vollständige Unterlagen, tragfähiges Einkommen, Einzug zeitnah, max. 3 Personen", "status": "aktiv"}]}
 </script>
 <script id="appcode">
 (function(){
 "use strict";
 var FONTLINK='<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">';
+var SUPA_URL="https://lgnqaazysivdepbsgayt.supabase.co", SUPA_ANON="sb_publishable_jexkPxbb1hCLdyhmkrRrow_WuSMvk46", SLUG="petersen";
 var state=null, embeddedSavedAt=0, cap=null, capKnown=false, pubTimer=null, retried=false, saveMode="init";
 var ui={objF:"alle", stufeF:"alle", openId:null, authed:false, addObj:false, sentHint:null};
+var zugang="", syncTimer=null, pendingRender=false, terminTimer={};
+function rpc(fn,args){
+  if(!SUPA_URL) return Promise.reject(new Error("offline"));
+  var H={"Content-Type":"application/json","apikey":SUPA_ANON};
+  if(SUPA_ANON.indexOf("eyJ")===0){H["Authorization"]="Bearer "+SUPA_ANON;}
+  return fetch(SUPA_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:H,
+    body:JSON.stringify(args)}).then(function(r){return r.json();});
+}
+function abmelden(){zugang=""; ui.authed=false; try{localStorage.removeItem("mc4-code-"+SLUG);}catch(e){} render();}
+function tipptGerade(){var a=document.activeElement; return !!(a&&a.closest&&a.closest("#app")&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));}
+function syncNow(){
+  if(!ui.authed||!zugang) return;
+  rpc("cockpit_lesen",{p_slug:SLUG,p_code:zugang}).then(function(d){
+    if(!d||d.ok!==true){ if(d&&d.grund==="code"){abmelden();} return; }
+    state.anfragen=(d.anfragen||[]);
+    try{persistLocal();}catch(e){}
+    if(tipptGerade()){pendingRender=true;} else {render();}
+  }).catch(function(){});
+}
+document.addEventListener("focusout",function(){ if(pendingRender){pendingRender=false; setTimeout(render,150);} });
 
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function uid(){return "o"+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);}
@@ -114,11 +135,15 @@ function objById(id){for(var i=0;i<state.objekte.length;i++) if(state.objekte[i]
 function draftOf(a){var t=String(a.termin||"").trim(); return t? a.entwurf.split("{TERMIN}").join(t) : a.entwurf.split("{TERMIN}").join("[TERMIN EINFÜGEN]");}
 document.addEventListener("input",function(ev){
   var el=(ev.target&&ev.target.closest)?ev.target.closest("[data-termin]"):null; if(!el)return;
-  var id=Number(el.getAttribute("data-termin"));
-  var a=state.anfragen.find(function(x){return x.id===id;}); if(!a)return;
+  var id=String(el.getAttribute("data-termin"));
+  var a=state.anfragen.find(function(x){return String(x.id)===id;}); if(!a)return;
   a.termin=el.value; state.savedAt=Date.now();
   try{persistLocal();}catch(e){}
   var d=document.querySelector('[data-draft="'+id+'"]'); if(d) d.textContent=draftOf(a);
+  clearTimeout(terminTimer[id]);
+  terminTimer[id]=setTimeout(function(){
+    rpc("cockpit_schreiben",{p_slug:SLUG,p_code:zugang,p_id:id,p_patch:{termin:a.termin}}).catch(function(){});
+  },900);
 });
 function fmtTs(ts){
   if(ts.indexOf("T")<0){var p=ts.split("-");return p[2]+"."+p[1]+".";}
@@ -135,12 +160,12 @@ function rows(){
 }
 
 /* ---- Persistenz (Seite speichert sich selbst) ---- */
-function persistLocal(){try{localStorage.setItem("mc-state-petersen",JSON.stringify(state));}catch(e){}}
+function persistLocal(){try{localStorage.setItem("mc4-state-"+SLUG,JSON.stringify(state));}catch(e){}}
 function commit(){state.savedAt=Date.now(); persistLocal(); render(); schedulePublish();}
 function buildDoc(){
   var css=document.getElementById("appcss").textContent;
   var code=document.getElementById("appcode").textContent;
-  var json=JSON.stringify(state).replace(/</g,"\\u003c");
+  var json=JSON.stringify({savedAt:state.savedAt,settings:state.settings,objekte:state.objekte}).replace(/</g,"\\u003c");
   return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Makler-Cockpit · Petersen</title>'
     +FONTLINK+'<style id="appcss">'+css+'</style></head><body><div id="app"></div>'
     +'<script type="application/json" id="state">'+json+'<\/script>'
@@ -153,14 +178,14 @@ function schedulePublish(){
 }
 function doPublish(){
   cap.publish(buildDoc()).then(function(){retried=false; saveMode="saved"; updateChip();}).catch(function(e){
-    var c=e&&e.code;
-    if(c==="conflict"){return;}
-    if(c==="rate_limited"){clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,5000); return;}
-    if(c==="upstream_error"&&!retried){retried=true; clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1500+Math.random()*1500); return;}
-    retried=false;
-    if(c==="not_granted"||c==="not_writer"||c==="not_declared"||c==="capability_disabled"||c==="capability_removed"){cap=null; saveMode="viewer";}
-    else{saveMode="local";}
-    updateChip();
+  var c=e&&e.code;
+  if(c==="conflict"){return;}
+  if(c==="rate_limited"){clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,5000); return;}
+  if(c==="upstream_error"&&!retried){retried=true; clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1500+Math.random()*1500); return;}
+  retried=false;
+  if(c==="not_granted"||c==="not_writer"||c==="not_declared"||c==="capability_disabled"||c==="capability_removed"){cap=null; saveMode="viewer";}
+  else{saveMode="local";}
+  updateChip();
   });
 }
 function chipTxt(){
@@ -224,11 +249,11 @@ function gateView(){
   +'<input type="password" id="gateCode" placeholder="Zugangscode" autocomplete="current-password" autofocus>'
   +'<button class="btn primary" type="submit">Anmelden</button>'
   +'<div class="err" id="gateErr"></div>'
-  +'<div class="gatefoot">Zugang nur für berechtigte Nutzer. Es werden keine Bewerber-Kontaktdaten gespeichert.</div>'
+  +'<div class="gatefoot">Zugang nur für berechtigte Nutzer. Der Code wird sicher auf dem Server geprüft; Anfragedaten liegen zugriffsgeschützt auf einem EU-Server.</div>'
   +'</form></div>';
 }
 function render(){
-  if(state.settings.code && !ui.authed){ gateView(); return; }
+  if(!ui.authed){ gateView(); return; }
   var r=rows();
   var A=r.filter(function(x){return x.stufe==="A";}).length,
       B=r.filter(function(x){return x.stufe==="B";}).length,
@@ -273,9 +298,9 @@ function render(){
   var objCards=state.objekte.map(function(o){
     var n=state.anfragen.filter(function(a){return a.obj===o.id;}).length;
     return '<div class="objcard'+(o.status!=="aktiv"?" off":"")+'">'
-      +'<span class="badge'+(o.status!=="aktiv"?" off":"")+'">'+(o.status==="aktiv"?"Aktiv":"Vermietet")+'</span>'
+      +'<span class="badge'+(o.status!=="aktiv"?" off":"")+'">'+(}o.status==="aktiv"?"Aktiv":"Vermietet")+'</span>'
       +'<div class="n" style="margin-top:8px">'+esc(o.name)+'</div>'
-      +'<div class="m">'+(o.miete?o.miete.toLocaleString("de-DE")+" € · ":"")+(o.moebl?esc(o.moebl)+" · ":"")+(o.ab?"ab "+esc(o.ab.split("-").reverse().join("."))+" · ":"")+n+' Anfragen</div>'
+      +'<div class="m">'+(c.miete?o.miete.toLocaleString("de-DE")+" € · ":"")+(o.moebl?esc(o.moebl)+" · ":"")+(o.ab?"ab "+esc(o.ab.split("-").reverse().join("."))+" · ":"")+n+' Anfragen</div>'
       +((o.refImmowelt||o.refScout)?'<div class="m" style="margin-top:-6px">Zuordnung: '+esc([o.refImmowelt?"IW "+o.refImmowelt:"",o.refScout?"IS "+o.refScout:""].filter(Boolean).join(" · "))+'</div>':'')
       +(o.krit?'<div class="m" style="margin-top:-6px">Kriterien: '+esc(o.krit.length>70?o.krit.slice(0,70)+"…":o.krit)+'</div>':'')
       +(o.status==="aktiv"
@@ -317,7 +342,7 @@ function render(){
     +'<div class="card inbox" style="margin-bottom:26px"><h2>Posteingang — vorsortiert</h2>'+list+'</div>'
     +'<div class="card"><h2>Ihre Objekte</h2><div class="objgrid">'+objCards+'</div>'+addForm
     +'<div class="limitnote">Ihr'+(state.settings.abo?(" "+state.settings.abo.charAt(0).toUpperCase()+state.settings.abo.slice(1)+"-"):" ")+'Paket umfasst '+state.settings.limit+' aktive Objekte'+(limitFull?' — Limit erreicht. Für weitere Objekte sprechen Sie Ihren Assistenten an.':'.')+'</div></div>'
-    +'<footer>Es wird nichts versendet, was Sie nicht freigegeben haben. „Antwort senden“ öffnet Ihr Mail-Programm — Absenderin bleiben Sie. · '+esc(state.settings.brand)+'</footer>';
+    +'<footer>Es wird nichts versendet, was Sie nicht freigegeben haben. „Antwort senden“ öffnet Ihr Mail-Programm — Absenderin bleiben Sie. · '+esc(state.settings.brand)+' · Cockpit v4</footer>';
 }
 
 /* ---- Events ---- */
@@ -326,8 +351,24 @@ document.addEventListener("submit",function(ev){
   if(f.id==="gateForm"){
     ev.preventDefault();
     var v=document.getElementById("gateCode").value.trim();
-    if(v===state.settings.code){ui.authed=true; try{sessionStorage.setItem("mc-auth-petersen","1");}catch(e){} render();}
-    else{document.getElementById("gateErr").textContent="Code nicht korrekt — bitte erneut versuchen.";}
+    var err=document.getElementById("gateErr");
+    var btn=f.querySelector("button[type=submit]");
+    if(!v){err.textContent="Bitte Zugangscode eingeben."; return;}
+    if(!SUPA_URL){err.textContent="Das System wird gerade umgestellt — bitte später erneut versuchen."; return;}
+    if(btn){btn.disabled=true; btn.textContent="Prüfe…";}
+    rpc("cockpit_login",{p_slug:SLUG,p_code:v}).then(function(d){
+      if(d&&d.ok===true){
+        zugang=v; ui.authed=true;
+        try{localStorage.setItem("mc4-code-"+SLUG,v);}catch(e){}
+        render(); syncNow();
+      } else {
+        err.textContent="Code nicht korrekt — bitte erneut versuchen.";
+        if(btn){btn.disabled=false; btn.textContent="Anmelden";}
+      }
+    }).catch(function(){
+      err.textContent="Keine Verbindung — bitte Internet prüfen und erneut versuchen.";
+      if(btn){btn.disabled=false; btn.textContent="Anmelden";}
+    });
   } else if(f.id==="objForm"){
     ev.preventDefault();
     var name=document.getElementById("of-name").value.trim();
@@ -352,15 +393,15 @@ document.addEventListener("click",function(ev){
   if(el=ev.target.closest("[data-of]")){ui.objF=el.getAttribute("data-of"); ui.openId=null; render(); return;}
   if(el=ev.target.closest("[data-sf]")){ui.stufeF=el.getAttribute("data-sf"); ui.openId=null; render(); return;}
   if(el=ev.target.closest("[data-copy]")){
-    var id=Number(el.getAttribute("data-copy"));
-    var a=state.anfragen.find(function(x){return x.id===id;});
+    var id=String(el.getAttribute("data-copy"));
+    var a=state.anfragen.find(function(x){return String(x.id)===id;});
     if(a&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(draftOf(a));}
     el.textContent="Kopiert ✓"; setTimeout(function(){try{el.textContent="Kopieren";}catch(e){}},1400);
     ev.stopPropagation(); return;
   }
   if(el=ev.target.closest("[data-send]")){
-    var idS=Number(el.getAttribute("data-send"));
-    var aS=state.anfragen.find(function(x){return x.id===idS;});
+    var idS=String(el.getAttribute("data-send"));
+    var aS=state.anfragen.find(function(x){return String(x.id)===idS;});
     if(aS){
       if(aS.entwurf.indexOf("{TERMIN}")>=0&&!String(aS.termin||"").trim()){
         var ti=document.querySelector('[data-termin="'+idS+'"]');
@@ -385,37 +426,26 @@ document.addEventListener("click",function(ev){
     var a=el.getAttribute("data-a");
     if(a==="addObj"){ui.addObj=true; render();}
     else if(a==="cancelObj"){ui.addObj=false; render();}
-    else if(a==="logout"){ui.authed=false; try{sessionStorage.removeItem("mc-auth-petersen");}catch(e){} render();}
+    else if(a==="logout"){abmelden();}
     return;
   }
   var row=ev.target.closest(".row[data-id]");
-  if(row){var id2=Number(row.getAttribute("data-id")); ui.openId=(ui.openId===id2?null:id2); render();}
+  if(row){var id2=String(row.getAttribute("data-id")); ui.openId=(ui.openId===id2?null:id2); render();}
 });
 
 /* ---- Boot ---- */
 (function boot(){
   try{state=JSON.parse(document.getElementById("state").textContent);}catch(e){state=null;}
-  if(!state||!state.anfragen){state={savedAt:1,settings:{code:"",limit:3,brand:"Anfragen-Assistent"},objekte:[],anfragen:[]};}
+  if(!state||!state.settings){state={savedAt:1,settings:{limit:3,brand:"Anfragen-Assistent"},objekte:[]};}
   embeddedSavedAt=state.savedAt||1;
-  try{var loc=JSON.parse(localStorage.getItem("mc-state-petersen")||"null"); if(loc&&loc.savedAt>embeddedSavedAt){state=loc;}}catch(e){}
-  try{ui.authed = sessionStorage.getItem("mc-auth-petersen")==="1";}catch(e){}
+  try{var loc=JSON.parse(localStorage.getItem("mc4-state-"+SLUG)||"null"); if(loc&&loc.savedAt>embeddedSavedAt){state=loc;}}catch(e){}
+  if(!state.anfragen){state.anfragen=[];}
+  try{zugang=localStorage.getItem("mc4-code-"+SLUG)||"";}catch(e){}
+  ui.authed=!!zugang;
   render();
-  /* ---- Pipeline-Sync: neue Anfragen aus data.json uebernehmen ---- */
-  try{
-    fetch("data.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
-      if(!d)return;
-      var changed=false;
-      if(d.anfragen&&d.anfragen.length){
-        var known={}; state.anfragen.forEach(function(a){known[String(a.id)]=1;});
-        d.anfragen.forEach(function(a){ if(a&&a.id&&!known[String(a.id)]){state.anfragen.push(a);changed=true;} });
-      }
-      if(d.objekte&&d.objekte.length){
-        var ko={}; state.objekte.forEach(function(o){ko[String(o.id)]=1;});
-        d.objekte.forEach(function(o){ if(o&&o.id!=null&&!ko[String(o.id)]){state.objekte.push(o);changed=true;} });
-      }
-      if(changed){ state.savedAt=Date.now(); try{localStorage.setItem("mc-state-petersen",JSON.stringify(state));}catch(e){} render(); }
-    }).catch(function(){});
-  }catch(e){}
+  /* ---- Pipeline-Sync: freigegebene Anfragen vom gesicherten Server laden ---- */
+  syncNow();
+  syncTimer=setInterval(syncNow,90000);
   var useFn=(typeof claude!=="undefined"&&claude&&claude.use)?claude.use:null;
   if(useFn){
     useFn("artifact").then(function(a){
