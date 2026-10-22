@@ -235,4 +235,97 @@ function objChart(){
     var k=state.anfragen.filter(function(a){return a.obj===o.id;}).length;
     var ak=state.anfragen.filter(function(a){return a.obj===o.id&&a.stufe==="A";}).length;
     html+='<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px"><span>'+esc(o.name)+'</span><span style="font-family:IBM Plex Mono,monospace;color:var(--muted)">'+k+' Anfragen · '+ak+'× A</span></div>'
-      +'<div style="background:var(--grid);border-radius:6px;height:12px;overflow:hidden"><div style="width:'+Math.round(k/max*100)+'%;height:100%;border-radius:6px;background:var(--accent)"
+      +'<div style="background:var(--grid);border-radius:6px;height:12px;overflow:hidden"><div style="width:'+Math.round(k/max*100)+'%;height:100%;border-radius:6px;background:var(--accent)"></div></div></div>';
+  });
+  return html;
+}
+
+/* ---- Render ---- */
+function gateView(){
+  document.getElementById("app").innerHTML=
+  '<div class="gate"><form class="gatecard" id="gateForm">'
+  +'<h1>Makler-Cockpit</h1><div class="s">'+esc(state.settings.brand)+' · Bitte Zugangscode eingeben</div>'
+  +'<input type="password" id="gateCode" placeholder="Zugangscode" autocomplete="current-password" autofocus>'
+  +'<button class="btn primary" type="submit">Anmelden</button>'
+  +'<div class="err" id="gateErr"></div>'
+  +'<div class="gatefoot">Zugang nur für berechtigte Nutzer. Der Code wird sicher auf dem Server geprüft; Anfragedaten liegen zugriffsgeschützt auf einem EU-Server.</div>'
+  +'</form></div>';
+}
+function render(){
+  if(!ui.authed){ gateView(); return; }
+  var r=rows();
+  var A=r.filter(function(x){return x.stufe==="A";}).length,
+      B=r.filter(function(x){return x.stufe==="B";}).length,
+      C=r.filter(function(x){return x.stufe==="C";}).length;
+  var total=state.anfragen.filter(function(a){var o=objById(a.obj); return o&&o.status==="aktiv";});
+  var bereit=total.filter(function(a){return a.astatus==="bereit";}).length;
+  var pruef=total.length-bereit;
+  var actObjs=state.objekte.filter(function(o){return o.status==="aktiv";});
+  var minPer=state.settings.minProAnfrage||3;
+  var zeitStr=(total.length*minPer/60).toFixed(1).replace(".",",");
+  var chips1='<span class="chiplabel">Objekt</span><button class="chip '+(ui.objF==="alle"?"on":"")+'" data-of="alle">Alle aktiven</button>'
+    +state.objekte.map(function(o){
+      var n=state.anfragen.filter(function(a){return a.obj===o.id;}).length;
+      return '<button class="chip '+(ui.objF===o.id?"on":"")+'" data-of="'+o.id+'">'+esc(o.name)+(o.status!=="aktiv"?" · vermietet":"")+'<span class="cnt">'+n+'</span></button>';
+    }).join("");
+  var stufen=[["alle","Alle"],["A","Einladen"],["B","Nachfragen"],["C","Absagen"]];
+  var chips2='<span class="chiplabel">Filter</span>'+stufen.map(function(s){
+    return '<button class="chip '+(ui.stufeF===s[0]?"on":"")+'" data-sf="'+s[0]+'">'+s[1]+'</button>';
+  }).join("");
+  r=r.slice().sort(function(a,b){return Number(b.id)-Number(a.id);});
+  var list=r.map(function(a){
+    var o=objById(a.obj);
+    return '<div class="row'+(ui.openId===a.id?" open":"")+'" data-id="'+esc(a.id)+'">'
+      +'<div class="head"><span class="pill '+esc(a.stufe)+'">'+(a.stufe==="A"?"EINLADEN":a.stufe==="B"?"NACHFRAGEN":"ABSAGEN")+'</span>'
+      +'<span class="who">'+esc(a.name)+'</span><span class="obj">'+esc(a.kurz)+'</span>'
+      +(a.real?'<span class="real">✓ '+esc(a.real)+'</span>':'')
+      +'<span class="ts">'+fmtTs(a.ts)+'</span></div>'
+      +'<div class="prev">'+esc(a.text)+'</div>'
+      +'<div class="detail"><div class="facts">'
+      +'<span class="fact"><b>Mietdauer:</b> '+esc(a.dauer)+'</span><span class="fact"><b>Einzug:</b> '+esc(a.einzug)+'</span><span class="fact"><b>Unterlagen:</b> '+esc(a.unterlagen)+'</span>'+(a.antwort_an?'<span class="fact"><b>Antwort an:</b> '+esc(a.antwort_an)+'</span>':'')+'</div>'
+      +'<div class="why"><b>Einstufung, weil:</b> '+esc(a.why)+'</div>'
+      +'<div class="draft-h"><span class="t">Ihr Antwortentwurf</span><span style="display:flex;gap:8px">'
+      +'<button class="btn small" data-copy="'+esc(a.id)+'">Kopieren</button>'
+      +'<button class="btn small primary" data-send="'+esc(a.id)+'">'+(a.antwort_weg==="portal"?"Text kopieren (Portal)":"Antwort senden")+'</button>'
+      +'</span></div>'
+      +'<div class="draft" data-draft="'+esc(a.id)+'">'+esc(draftOf(a))+'</div>'
+      +(a.entwurf.indexOf("{TERMIN}")>=0?'<div class="termrow"><span class="termlabel">📅 Besichtigungstermin:</span><input class="terminput" data-termin="'+esc(a.id)+'" placeholder="z. B. Donnerstag, 24.10., 17:00 Uhr" value="'+esc(a.termin||"")+'"></div><div class="termhint">'+(String(a.termin||"").trim()?'Termin eingesetzt ✓ — der Entwurf ist versandbereit.':'Termin eintippen — er ersetzt automatisch den Platzhalter im Entwurf.')+'</div>':'')
+      +(ui.sentHint===a.id?'<div class="senthint">'+(a.antwort_weg==="portal"?'Antwort über das Portal senden — der Text ist kopiert. Einfach im Portal-Postfach einfügen.':'Text kopiert ✓ — öffnet sich Ihr Mail-Programm nicht (in der Vorschau gesperrt), einfach in eine neue E-Mail einfügen. Auf der installierten App öffnet es sich direkt.')+'</div>':'')
+      +'</div></div>';
+  }).join("");
+  if(!list) list='<p style="color:var(--muted);font-size:.9rem;padding:8px 4px">Keine Anfragen in diesem Filter.</p>';
+  var objCards=state.objekte.map(function(o){
+    var n=state.anfragen.filter(function(a){return a.obj===o.id;}).length;
+    return '<div class="objcard'+(o.status!=="aktiv"?" off":"")+'">'
+      +'<span class="badge'+(o.status!=="aktiv"?" off":"")+'">'+(o.status==="aktiv"?"Aktiv":"Vermietet")+'</span>'
+      +'<div class="n" style="margin-top:8px">'+esc(o.name)+'</div>'
+      +'<div class="m">'+(o.miete?o.miete.toLocaleString("de-DE")+" € · ":"")+(o.moebl?esc(o.moebl)+" · ":"")+(o.ab?"ab "+esc(o.ab.split("-").reverse().join("."))+" · ":"")+n+' Anfragen</div>'
+      +((o.refImmowelt||o.refScout)?'<div class="m" style="margin-top:-6px">Zuordnung: '+esc([o.refImmowelt?"IW "+o.refImmowelt:"",o.refScout?"IS "+o.refScout:""].filter(Boolean).join(" · "))+'</div>':'')
+      +(o.krit?'<div class="m" style="margin-top:-6px">Kriterien: '+esc(o.krit.length>70?o.krit.slice(0,70)+"…":o.krit)+'</div>':'')
+      +(o.status==="aktiv"
+        ?'<button class="btn small" data-vermietet="'+o.id+'">Als vermietet markieren</button>'
+        :'<button class="btn small" data-reaktiv="'+o.id+'">Wieder aktivieren</button>')
+      +'</div>';
+  }).join("");
+  var limitFull=actObjs.length>=state.settings.limit;
+  var addForm= ui.addObj
+    ? '<form class="objform" id="objForm">'
+      +'<div class="full"><label>Objekt / Adresse *</label><input id="of-name" placeholder="z. B. 3-Zi Harvestehude, Beispielweg 4" required></div>'
+      +'<div><label>Kaltmiete €</label><input id="of-miete" type="number" min="0" placeholder="1500"></div>'
+      +'<div><label>Möblierung</label><select id="of-moebl"><option>möbliert</option><option>teilmöbliert</option><option>unmöbliert</option></select></div>'
+      +'<div><label>Verfügbar ab</label><input id="of-ab" type="date"></div>'
+      +'<div><label>Wunsch-Mietdauer</label><input id="of-dauer" placeholder="z. B. min. 12 Monate"></div>'
+      +'<div><label>Ref.-Nr. Immowelt</label><input id="of-refi" placeholder="z. B. 3513-04"></div>'
+      +'<div><label>Objekt-ID ImmoScout</label><input id="of-refs" placeholder="z. B. 170398082"></div>'
+      +'<div class="full"><label>Woran erkennen Sie hier einen Top-Kandidaten? *</label><textarea id="of-krit" required placeholder="z. B. vollständige Unterlagen, Einkommen ab 4.500 €, Einzug bis 01.11., keine WG"></textarea></div>'
+      +'<div class="full" style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-a="cancelObj">Abbrechen</button><button class="btn primary" type="submit">Objekt live schalten</button></div>'
+      +'<div class="full limitnote">Über Ref.-Nr. und Objekt-ID ordnet das System eingehende Anfragen automatisch diesem Objekt zu. Die Kriterien steuern die Einstufung ab der ersten Anfrage. Bitte melden Sie neue Objekte auch Ihrem Assistenten, damit die automatische Zuordnung sie kennt.</div>'
+      +'</form>'
+    : '<div style="margin-top:14px"><button class="btn primary" data-a="addObj" '+(limitFull?"disabled":"")+'>+ Objekt hinzufügen</button></div>';
+  document.getElementById("app").innerHTML=
+    '<div class="top"><div><h1>Makler-Cockpit</h1><div class="sub">'+(function(){var h=new Date().getHours();var g=h<11?"Guten Morgen":h<18?"Guten Tag":"Guten Abend";return state.settings.kunde?g+", "+esc(state.settings.kunde):esc(state.settings.brand);})()+'</div></div><div style="text-align:right"><div class="sub">'+(state.settings.abo?("Paket "+state.settings.abo.charAt(0).toUpperCase()+state.settings.abo.slice(1)+" · "):"")+actObjs.length+' von '+state.settings.limit+' Objekten aktiv</div><div class="savechip" id="savechip">'+chipTxt()+'</div></div></div>'
+    +'<div class="statusline"><span><b>'+total.length+'</b> Anfragen</span><span><b>'+bereit+'</b> geprüft &amp; bereit</span><span><b>'+pruef+'</b> in Qualitätsprüfung</span><span style="margin-left:auto"><button class="btn small" data-a="logout">Abmelden</button></span></div>'
+    +'<div class="chips">'+chips1+'</div>'
+    +'<div class="chips second">'+chips2+'</div>'
+    +'<div class="kpis">'
+    +'<div class="kpi t"><div c
