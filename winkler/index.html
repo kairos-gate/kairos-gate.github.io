@@ -167,30 +167,4 @@ function buildDoc(){
   var json=JSON.stringify({savedAt:state.savedAt,settings:state.settings,objekte:state.objekte}).replace(/</g,"\\u003c");
   return '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Makler-Cockpit · Winkler</title>'
     +FONTLINK+'<style id="appcss">'+css+'</style></head><body><div id="app"></div>'
-    +'<script type="application/json" id="state">'+json+'<\/script>'
-    +'<script id="appcode">'+code+'<\/script></body></html>';
-}
-function schedulePublish(){
-  if(!cap){ if(capKnown){saveMode="local"; updateChip();} return; }
-  saveMode="saving"; updateChip();
-  clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1600);
-}
-function doPublish(){
-  cap.publish(buildDoc()).then(function(){retried=false; saveMode="saved"; updateChip();}).catch(function(e){
-    var c=e&&e.code;
-    if(c==="conflict"){return;}
-    if(c==="rate_limited"){clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,5000); return;}
-    if(c==="upstream_error"&&!retried){retried=true; clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1500+Math.random()*1500); return;}
-    retried=false;
-    if(c==="not_granted"||c==="not_writer"||c==="not_declared"||c==="capability_disabled"||c==="capability_removed"){cap=null; saveMode="viewer";}
-    else{saveMode="local";}
-    updateChip();
-  });
-}
-function chipTxt(){
-  if(saveMode==="saving")return "Speichert…";
-  if(saveMode==="saved")return "Gespeichert";
-  if(saveMode==="viewer")return "Ansichtsmodus — Änderungen gehen an Ihren Assistenten";
-  if(saveMode==="lokal")return "Lokal gespeichert";
-  return "";
-}
+    +'<script type="application/json" i
