@@ -641,4 +641,103 @@ document.addEventListener("click",function(ev){
       var w=document.getElementById("objwrap-"+slug);
       if(w){w.setAttribute("data-loaded","1");w.innerHTML=objListeHtml(ku);}
     })["catch"](function(err){
-      el.disabled=false; el.textContent="\ud83c\udfe0
+      el.disabled=false; el.textContent="\ud83c\udfe0 Objekte anzeigen/verwalten";
+      alert("Objekte konnten nicht geladen werden: "+err.message);
+    });
+    return;
+  }
+  if(el=ev.target.closest(".obj-tgl")){
+    var slug2=el.getAttribute("data-slug"), oid=el.getAttribute("data-oid");
+    var ku2=null; state.kunden.forEach(function(k){if(k.slug===slug2)ku2=k;});
+    var stC=objCache[slug2];
+    if(!ku2||!stC)return;
+    var o=null; stC.objekte.forEach(function(x){if(x.id===oid)o=x;});
+    if(!o)return;
+    if(o.status!=="aktiv"){
+      var limT=(stC.settings&&stC.settings.limit)||3;
+      var aktT=stC.objekte.filter(function(x){return x.status==="aktiv";}).length;
+      if(aktT>=limT){alert("Objekt-Limit erreicht — zuerst das Abo-Paket erh\u00f6hen oder ein anderes Objekt auf vermietet stellen.");return;}
+    }
+    el.disabled=true; el.textContent="Speichere…";
+    cockpitSchreiben(slug2,function(st){
+      st.objekte.forEach(function(x){if(x.id===oid)x.status=(x.status==="aktiv"?"vermietet":"aktiv");});
+      return st;
+    },"Kunde "+slug2+": Objekt-Status ge\u00e4ndert").then(function(st){
+      objCache[slug2]=st;
+      var w=document.getElementById("objwrap-"+slug2);
+      if(w)w.innerHTML=objListeHtml(ku2);
+    })["catch"](function(err){
+      el.disabled=false; el.textContent=(o.status==="aktiv"?"Auf vermietet":"Aktivieren");
+      alert("Abbruch: "+err.message+" \u2014 du kannst es einfach nochmal versuchen.");
+    });
+    return;
+  }
+  if(el=ev.target.closest(".obj-add")){
+    var slug3=el.getAttribute("data-slug");
+    var ku3=null; state.kunden.forEach(function(k){if(k.slug===slug3)ku3=k;});
+    var stC3=objCache[slug3];
+    if(!ku3||!stC3)return;
+    function ov(p){var e=document.getElementById("oa-"+p+"-"+slug3);return e?clean(e.value):"";}
+    var mieteRoh=document.getElementById("oa-miete-"+slug3)?document.getElementById("oa-miete-"+slug3).value:"";
+    var f3={name:ov("name"),miete:Number(String(mieteRoh).replace(/[^0-9]/g,"")),dauer:ov("dauer"),krit:ov("krit"),
+      scout:(document.getElementById("oa-scout-"+slug3)?document.getElementById("oa-scout-"+slug3).value:"").replace(/[^0-9a-zA-Z-]/g,""),
+      iw:(document.getElementById("oa-iw-"+slug3)?document.getElementById("oa-iw-"+slug3).value:"").replace(/[^0-9a-zA-Z-]/g,"")};
+    if(!/^[^<>&"]{3,80}$/.test(f3.name)){alert("Bitte eine Objekt-Bezeichnung eingeben (3\u201380 Zeichen, ohne < > &).");return;}
+    if(!(f3.miete>0)){alert("Bitte die Kaltmiete als Zahl eingeben.");return;}
+    var lim3=(stC3.settings&&stC3.settings.limit)||3;
+    var akt3=stC3.objekte.filter(function(x){return x.status==="aktiv";}).length;
+    if(akt3>=lim3){alert("Objekt-Limit erreicht \u2014 zuerst das Abo-Paket erh\u00f6hen.");return;}
+    el.disabled=true; el.textContent="Lege Objekt an\u2026";
+    cockpitSchreiben(slug3,function(st){
+      var lim=(st.settings&&st.settings.limit)||3;
+      var akt=st.objekte.filter(function(x){return x.status==="aktiv";}).length;
+      if(akt>=lim) throw new Error("Objekt-Limit erreicht");
+      st.objekte.push({id:objUid(),name:f3.name,miete:f3.miete,moebl:"",ab:"",dauer:f3.dauer,refImmowelt:f3.iw,refScout:f3.scout,krit:f3.krit,status:"aktiv"});
+      return st;
+    },"Kunde "+slug3+": Objekt angelegt").then(function(st){
+      objCache[slug3]=st;
+      var w=document.getElementById("objwrap-"+slug3);
+      if(w)w.innerHTML=objListeHtml(ku3);
+      alert("Objekt angelegt \u2713\n\nLetzter Schritt: Sag Claude im Chat \u201eNeues Objekt bei "+ku3.name+": "+f3.name+"\u201c \u2014 dann ordnet die KI eingehende Anfragen auch diesem Objekt zu.");
+    })["catch"](function(err){
+      el.disabled=false; el.textContent="Objekt anlegen";
+      alert("Abbruch: "+err.message+" \u2014 du kannst es einfach nochmal versuchen.");
+    });
+    return;
+  }
+});
+
+function tryGate(){
+  var v=document.getElementById("gc").value.trim();
+  var ge=document.getElementById("gerr");
+  var gb=document.getElementById("gbtn");
+  if(!v){ge.textContent="Bitte Zugangscode eingeben.";return;}
+  if(gb){gb.disabled=true;gb.textContent="Prüfe…";}
+  rpc("admin_anfragen",{p_admin_code:v}).then(function(d){
+    if(d&&d.ok===true){
+      adminCode=v; state.authed=true;
+      try{localStorage.setItem("z4-admin",v);}catch(e){}
+      load();
+    } else {
+      ge.textContent="Code nicht korrekt — bitte erneut versuchen.";
+      if(gb){gb.disabled=false;gb.textContent="Öffnen";}
+    }
+  })["catch"](function(err){
+    ge.textContent=(String(err&&err.message).indexOf("verbunden")>=0)?"Die Datenbank ist noch nicht verbunden — das richtet Claude gerade ein.":"Keine Verbindung — bitte Internet prüfen und erneut versuchen.";
+    if(gb){gb.disabled=false;gb.textContent="Öffnen";}
+  });
+}
+
+if(adminCode){state.authed=true; load();} else {render();}
+setInterval(function(){
+  if(!state.authed||state.loading) return;
+  var ae=document.activeElement;
+  if(ae&&ae.closest&&(ae.closest(".nkform")||ae.id==="ghtok"||ae.id==="admneu")) return;
+  if(document.querySelector("details[open]")) return;
+  if(document.querySelector(".objwrap[data-loaded]")) return;
+  if(document.getElementById("nk-steps")&&document.getElementById("nk-steps").style.display==="block") return;
+  load();
+},120000);
+</script>
+</body>
+</html>
