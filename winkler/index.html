@@ -192,7 +192,7 @@ function chipTxt(){
   if(saveMode==="saving")return "Speichert…";
   if(saveMode==="saved")return "Gespeichert";
   if(saveMode==="viewer")return "Ansichtsmodus — Änderungen gehen an Ihren Assistenten";
-  if(saveMode==="lokal")return "Lokal gespeichert";
+  if(saveMode==="local")return "Lokal gespeichert";
   return "";
 }
 function updateChip(){var el=document.getElementById("savechip"); if(el) el.textContent=chipTxt();}
