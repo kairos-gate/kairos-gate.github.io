@@ -388,4 +388,129 @@ function freigeben(ku,a,btn){
 }
 
 function verwerfen(ku,a,btn){
-  if(!confirm("Diese Anfrage von „"+a.name+"“ wirklich verwerfen?\n\nSie wird endgül
+  if(!confirm("Diese Anfrage von „"+a.name+"“ wirklich verwerfen?\n\nSie wird endgültig aus dem System gelöscht und erscheint in keinem Cockpit."))return;
+  btn.disabled=true; btn.textContent="Verwerfe…";
+  rpc("admin_verwerfen",{p_admin_code:adminCode,p_id:String(a.id)}).then(function(d){
+    if(d&&d.grund==="code") throw new Error("Admin-Code nicht mehr gültig");
+    var p=state.per[ku.slug]||{pending:[],live:[]};
+    p.pending=p.pending.filter(function(x){return String(x.id)!==String(a.id);});
+    state.per[ku.slug]=p;
+    render();
+  })["catch"](function(err){
+    btn.disabled=false; btn.textContent="Verwerfen";
+    alert("Abbruch: "+err.message);
+  });
+}
+
+function kundeCard(ku){
+  var p=state.per[ku.slug]||{pending:[],live:[]};
+  var offen=0; p.pending.forEach(function(a){ if(statusOf(ku,a)==="open") offen++; });
+  var foot = ku.slug==="unklar"
+    ? '<p class="note" style="margin-top:10px">Hier landen Anfragen, die die KI keinem Kunden sicher zuordnen konnte. Zum Klären: Original-Mail mit eindeutigem Objektnamen erneut an den Briefkasten senden — und die unklare Anfrage hier verwerfen.</p>'
+    : '<div class="kfoot"><a class="linkbtn" href="'+esc(PAGES+ku.slug+"/")+'" target="_blank" rel="noopener">Cockpit öffnen ↗</a>'
+      +'<span class="codeline">Zugang: über „⚙️ Verwalten“ änderbar</span></div>';
+  var verwalten='';
+  if(ku.slug!=="unklar"&&ghTokenGet()){
+    var delTeil = ku.slug==="petersen"
+      ? '<p class="note">Dieser Kunde ist die Bau-Vorlage f\u00fcr neue Kunden und kann nicht gel\u00f6scht werden.</p>'
+      : '<p></p><button class="danger kd-del" data-slug="'+esc(ku.slug)+'">Kunde endg\u00fcltig l\u00f6schen</button>';
+    verwalten='<details><summary>\u2699\ufe0f Verwalten</summary>'
+      +'<div class="nkform vwform">'
+      +'<label>Kundenname</label><input id="ed-name-'+esc(ku.slug)+'" value="'+esc(ku.name)+'">'
+      +'<div class="nkrow2"><div><label>Neuer Zugangscode (leer = unverändert)</label><input id="ed-code-'+esc(ku.slug)+'" value="" placeholder="mind. 8 Zeichen" autocomplete="off"></div>'
+      +'<div><label>Objekt-Bezeichnung</label><input id="ed-obj-'+esc(ku.slug)+'" value="'+esc(ku.objekt)+'"></div></div>'
+      +'<label>Abo-Paket</label><select id="ed-abo-'+esc(ku.slug)+'" style="font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff">'+aboOptions(ku.abo||"")+'</select>'
+      +'<button class="go edit-save" data-slug="'+esc(ku.slug)+'">Speichern</button>'
+      +'</div>'
+      +'<div class="objwrap" '+(objCache[ku.slug]?'data-loaded="1" ':'')+'id="objwrap-'+esc(ku.slug)+'">'
+      +(objCache[ku.slug]?objListeHtml(ku):'<p></p><button class="done obj-load" data-slug="'+esc(ku.slug)+'">\ud83c\udfe0 Objekte anzeigen/verwalten</button>')
+      +'</div>'
+      +delTeil
+      +'<div class="steps" id="vw-steps-'+esc(ku.slug)+'"></div>'
+      +'</details>';
+  }
+  return '<div class="card">'
+    +'<div class="kname">'+esc(ku.name)+(ku.abo&&aboName(ku.abo)?' <span class="pill" style="vertical-align:2px">'+esc(aboName(ku.abo))+'</span>':'')+'</div>'
+    +'<div class="kobj">'+esc(ku.objekt)+'</div>'
+    +'<div class="knums"><span class="num o">'+offen+'</span><span class="numlabel">zu entscheiden</span>'
+    +'<span class="num g">'+p.live.length+'</span><span class="numlabel">im Cockpit</span></div>'
+    +foot
+    +verwalten
+    +'</div>';
+}
+
+function addCard(){
+  if(!ghTokenGet()){
+    return '<div class="card"><details><summary>＋ Neuen Kunden anlegen</summary>'
+      +'<p class="note">Damit die Zentrale neue Kunden selbst anlegen kann, hinterlege einmalig deinen GitHub-Schl\u00fcssel: ganz unten bei \u201e\u2699\ufe0f Einrichtung\u201c (steht in deiner Notizen-App, beginnt mit github_pat\u2026). Er bleibt nur auf diesem Ger\u00e4t.</p>'
+      +'</details></div>';
+  }
+  return '<div class="card"><details><summary>＋ Neuen Kunden anlegen</summary>'
+    +'<div class="nkform">'
+    +'<label>Kundenname (so erscheint er \u00fcberall)</label><input id="nk-name" placeholder="z. B. Frau Maria Schmidt">'
+    +'<div class="nkrow2"><div><label>Kennung (klein, ohne Leerzeichen)</label><input id="nk-slug" placeholder="schmidt"></div>'
+    +'<div><label>Cockpit-Zugangscode</label><input id="nk-code" placeholder="z. B. elbblick"></div></div>'
+    +'<label>Objekt-Bezeichnung</label><input id="nk-obj" placeholder="z. B. Elbchaussee 7 \u00b7 2-Zi mit Balkon">'
+    +'<div class="nkrow2"><div><label>Kaltmiete in \u20ac</label><input id="nk-miete" placeholder="1600" inputmode="numeric"></div>'
+    +'<div><label>Mindestmietdauer</label><input id="nk-dauer" placeholder="z. B. min. 12 Monate"></div></div>'
+    +'<label>Kriterien f\u00fcr Top-Kandidaten (optional)</label><input id="nk-krit" placeholder="z. B. max. 2 Personen, keine Haustiere">'
+    +'<div class="nkrow2"><div><label>ImmoScout Scout-ID (optional)</label><input id="nk-scout" placeholder="170398081"></div>'
+    +'<div><label>Immowelt-Nummer (optional)</label><input id="nk-iw" placeholder="3513-03"></div></div>'
+    +'<label>Abo-Paket</label><select id="nk-abo" style="font:inherit;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff">'+aboOptions("starter")+'</select>'
+    +'<button class="go" id="nk-go">\ud83c\udfd7\ufe0f Kunde anlegen</button>'
+    +'</div><div class="steps" id="nk-steps"></div>'
+    +'</details></div>';
+}
+
+function cardHtml(ku,a,st){
+  var verwerfenBtn='<button class="ghost vw-del" data-id="'+esc(a.id)+'" data-slug="'+esc(ku.slug)+'" style="border:1px solid var(--line);border-radius:10px;width:100%;margin-top:6px">Verwerfen (endgültig löschen)</button>';
+  var btn = ku.slug==="unklar" ? '<button class="done" disabled>Zuordnung unklar — Mail mit eindeutigem Objekt neu senden</button>'+verwerfenBtn
+    : st==="open" ? '<button class="go" data-id="'+esc(a.id)+'" data-slug="'+esc(ku.slug)+'">✅ FREIGEBEN — ins Cockpit übernehmen</button>'+verwerfenBtn
+    : '<button class="done" disabled>✓ Im Cockpit von '+esc(ku.name)+'</button>';
+  return '<div class="card">'
+    +'<div class="row"><span class="badge '+esc(a.stufe)+'">'+esc(a.stufe)+'</span><span class="name">'+esc(a.name)+'</span><span class="cpill">'+esc(ku.name)+'</span><span class="pill">'+esc(a.kurz)+'</span></div>'
+    +'<div class="meta">Einzug: '+esc(a.einzug)+' · Dauer: '+esc(a.dauer)+' · Unterlagen: '+esc(a.unterlagen)+(a.ts?(' · '+esc(a.ts)):'')+'</div>'
+    +'<div class="why">'+esc(a.why)+'</div>'
+    +'<details><summary>Antwortentwurf ansehen</summary><pre>'+esc(a.entwurf)+'</pre></details>'
+    +'<details><summary>Original-Anfrage</summary><pre>'+esc(a.text)+'</pre></details>'
+    +'<p></p>'+btn+'</div>';
+}
+
+function render(){
+  var el=document.getElementById("app");
+  if(!state.authed){
+    el.innerHTML='<div class="gate card"><h1>Kairos Zentrale</h1><div class="sub">Bitte Zugangscode eingeben</div>'
+      +'<p></p><input type="password" id="gc" placeholder="Zugangscode" autofocus>'
+      +'<p></p><button class="go" id="gbtn">Öffnen</button><div class="err" id="gerr"></div></div>';
+    document.getElementById("gbtn").onclick=tryGate;
+    document.getElementById("gc").addEventListener("keydown",function(e){if(e.key==="Enter")tryGate();});
+    return;
+  }
+  var h='<header><div><h1>Kairos Zentrale</h1><div class="sub">Dein Arbeitsplatz · Kunden & Freigaben</div></div>'
+    +'<div class="topbtns"><button class="ghost" id="reload">↻ Aktualisieren</button></div></header>';
+  if(state.loading){ el.innerHTML=h+'<div class="empty">Lade Daten…</div>'; bind(); return; }
+
+  if(state.dbOk===false){
+    h+='<div class="card" style="border-color:#B87A1E;background:#FDF6EC"><b>⚠️ Datenbank gerade nicht erreichbar.</b><div class="note">Anfragen können im Moment nicht geladen oder freigegeben werden. Oben „↻ Aktualisieren“ drücken — wenn es bleibt, Claude Bescheid sagen.</div></div>';
+  }
+
+  /* Kundenübersicht */
+  h+='<p class="sect">Kunden</p><div class="kgrid">';
+  state.kunden.forEach(function(ku){ h+=kundeCard(ku); });
+  h+=addCard()+'</div>';
+
+  /* Anfragen einsammeln: offen + gerade übertragen bleiben oben, nur Live wandert zu Erledigt */
+  var open=[],done=[],openCnt=0;
+  state.kunden.forEach(function(ku){
+    var p=state.per[ku.slug]||{pending:[]};
+    p.pending.forEach(function(a){
+      var st=statusOf(ku,a);
+      if(st==="live"){ done.push({ku:ku,a:a,st:st}); }
+      else{ if(st==="open")openCnt++; open.push({ku:ku,a:a,st:st}); }
+    });
+  });
+  open.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
+  done.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
+
+  h+='<p class="sect">Zu entscheiden ('+openCnt+')</p>';
+  if(!open.length){ h+='<div clas
