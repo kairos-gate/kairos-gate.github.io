@@ -513,4 +513,140 @@ function render(){
   done.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
 
   h+='<p class="sect">Zu entscheiden ('+openCnt+')</p>';
-  if(!open.length){ h+='<div clas
+  if(!open.length){ h+='<div class="empty">Nichts offen — alles entschieden.<br>Neue eingestufte Anfragen erscheinen hier automatisch.</div>'; }
+  open.forEach(function(x){ h+=cardHtml(x.ku,x.a,x.st); });
+
+  if(done.length){
+    h+='<details style="border:0;margin-top:18px"><summary>Erledigt ('+done.length+')</summary>';
+    done.forEach(function(x){ h+=cardHtml(x.ku,x.a,x.st); });
+    h+='</details>';
+  }
+  h+='<div class="card" style="margin-top:22px"><details><summary>⚙️ Einrichtung</summary>'
+    +'<p class="note"><b>GitHub-Schl\u00fcssel</b> \u2014 n\u00f6tig, damit die Zentrale Kunden-Seiten anlegen und verwalten kann ('+(ghTokenGet()?'hinterlegt \u2713':'noch nicht hinterlegt')+'). Er wird nur auf diesem Ger\u00e4t gespeichert.</p>'
+    +'<input id="ghtok" type="password" placeholder="github_pat_\u2026" value="'+esc(ghTokenGet())+'">'
+    +'<p></p><button class="go" id="ghtoksave">Schl\u00fcssel speichern</button>'
+    +'<p class="note" style="margin-top:18px"><b>Zentrale-Zugangscode \u00e4ndern</b> \u2014 der Code, mit dem du dich hier anmeldest (mind. 8 Zeichen, wird sicher auf dem Server gepr\u00fcft).</p>'
+    +'<input id="admneu" type="password" placeholder="neuer Zugangscode (mind. 8 Zeichen)" autocomplete="new-password">'
+    +'<p></p><button class="go" id="admsave">Zugangscode \u00e4ndern</button></details></div>';
+  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 4.0 · Anfragedaten liegen zugriffsgesch\u00fctzt in der EU-Datenbank</p>';
+  el.innerHTML=h; bind();
+}
+
+function bind(){
+  var r=document.getElementById("reload"); if(r) r.onclick=load;
+  var adm=document.getElementById("admsave");
+  if(adm) adm.onclick=function(){
+    var inp=document.getElementById("admneu");
+    var v=inp?inp.value.trim():"";
+    if(v.length<8){alert("Der neue Zugangscode braucht mindestens 8 Zeichen.");return;}
+    adm.disabled=true; adm.textContent="Ändere…";
+    rpc("admin_code_aendern",{p_admin_code:adminCode,p_neu:v}).then(function(d){
+      if(!d||d.ok!==true) throw new Error(d&&d.grund==="zu_kurz"?"Der neue Code ist zu kurz":"Code konnte nicht geändert werden");
+      adminCode=v; try{localStorage.setItem("z4-admin",v);}catch(e){}
+      alert("Zugangscode geändert ✓ — ab sofort gilt nur noch der neue Code.");
+      adm.disabled=false; adm.textContent="Zugangscode ändern"; if(inp)inp.value="";
+    })["catch"](function(err){
+      adm.disabled=false; adm.textContent="Zugangscode ändern";
+      alert("Abbruch: "+err.message);
+    });
+  };
+  var gt=document.getElementById("ghtoksave");
+  if(gt) gt.onclick=function(){
+    var inp=document.getElementById("ghtok");
+    var v=inp?inp.value.trim():"";
+    if(v&&v.indexOf("github_pat_")!==0&&v.indexOf("ghp_")!==0){alert("Das sieht nicht nach einem GitHub-Schl\u00fcssel aus (beginnt mit github_pat_).");return;}
+    ghTokenSet(v);
+    alert(v?"Schl\u00fcssel gespeichert \u2713":"Schl\u00fcssel entfernt.");
+    render();
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("button.edit-save"),function(b){
+    b.onclick=function(){
+      var slug=b.getAttribute("data-slug");
+      var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+      if(!ku)return;
+      function v(id){var e=document.getElementById(id);return e?clean(e.value):"";}
+      var f={name:v("ed-name-"+slug),code:(document.getElementById("ed-code-"+slug)?document.getElementById("ed-code-"+slug).value.trim():""),objekt:v("ed-obj-"+slug),abo:(document.getElementById("ed-abo-"+slug)?document.getElementById("ed-abo-"+slug).value:"")};
+      if(f.abo&&!ABOS[f.abo]){f.abo="";}
+      if(!/^[^<>&"]{2,40}$/.test(f.name)){alert("Bitte einen g\u00fcltigen Kundennamen eingeben (2\u201340 Zeichen, ohne < > &).");return;}
+      if(f.code&&f.code.length<8){alert("Ein neuer Zugangscode braucht mindestens 8 Zeichen \u2014 oder lass das Feld leer, dann bleibt der alte Code.");return;}
+      if(!/^[^<>&"]{3,80}$/.test(f.objekt)){alert("Bitte eine g\u00fcltige Objekt-Bezeichnung eingeben (3\u201380 Zeichen, ohne < > &).");return;}
+      var sb=document.getElementById("vw-steps-"+slug); if(sb){sb.innerHTML="";}
+      kundeSpeichern(ku,f,b);
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("button.kd-del"),function(b){
+    b.onclick=function(){
+      var slug=b.getAttribute("data-slug");
+      var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+      if(!ku)return;
+      var sb=document.getElementById("vw-steps-"+slug); if(sb){sb.innerHTML="";}
+      kundeLoeschen(ku,b);
+    };
+  });
+  var nn=document.getElementById("nk-name");
+  if(nn) nn.oninput=function(){var s=document.getElementById("nk-slug");if(s&&!s.getAttribute("data-touched"))s.value=slugVorschlag(nn.value);};
+  var ns=document.getElementById("nk-slug");
+  if(ns) ns.oninput=function(){ns.setAttribute("data-touched","1");};
+  var ng=document.getElementById("nk-go");
+  if(ng) ng.onclick=function(){
+    function val(id){var e=document.getElementById(id);return e?e.value.trim():"";}
+    var f={name:clean(val("nk-name")),slug:val("nk-slug").toLowerCase(),code:val("nk-code"),objekt:clean(val("nk-obj")),miete:Number(val("nk-miete").replace(/[^0-9]/g,"")),dauer:clean(val("nk-dauer")),krit:clean(val("nk-krit")),scout:val("nk-scout").replace(/[^0-9a-zA-Z-]/g,""),iw:val("nk-iw").replace(/[^0-9a-zA-Z-]/g,""),abo:(document.getElementById("nk-abo")?document.getElementById("nk-abo").value:"starter")};
+    if(!ABOS[f.abo]){f.abo="starter";}
+    if(!/^[^<>&"]{2,40}$/.test(f.name)){alert("Bitte einen Kundennamen eingeben (2\u201340 Zeichen, ohne Sonderzeichen wie < > &).");return;}
+    if(!/^[a-z0-9-]{2,20}$/.test(f.slug)){alert("Die Kennung darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten (2\u201320 Zeichen).");return;}
+    if(RESERVIERT.indexOf(f.slug)>=0){alert("Diese Kennung ist reserviert \u2014 bitte eine andere w\u00e4hlen.");return;}
+    var belegt=false; state.kunden.forEach(function(k){if(k.slug===f.slug)belegt=true;});
+    if(belegt){alert("Diese Kennung ist schon vergeben \u2014 bitte eine andere w\u00e4hlen.");return;}
+    if(!/^[^<>&"\s]{8,40}$/.test(f.code)){alert("Der Zugangscode braucht mindestens 8 Zeichen (ohne Leerzeichen) \u2014 z. B. zwei W\u00f6rter mit Zahl: eppendorf-2026.");return;}
+    if(!/^[^<>&"]{3,80}$/.test(f.objekt)){alert("Bitte eine Objekt-Bezeichnung eingeben (3\u201380 Zeichen, ohne < > &).");return;}
+    if(!(f.miete>0)){alert("Bitte die Kaltmiete als Zahl eingeben.");return;}
+    if(!ghTokenGet()){alert("Bitte zuerst unten in der Einrichtung den GitHub-Schl\u00fcssel hinterlegen.");return;}
+    var b=document.getElementById("nk-steps"); if(b){b.innerHTML="";}
+    neuerKunde(f);
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("button.go[data-id]"),function(b){
+    b.onclick=function(){
+      var id=b.getAttribute("data-id"), slug=b.getAttribute("data-slug");
+      var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+      if(!ku) return;
+      var p=state.per[slug]||{pending:[]};
+      var a=p.pending.filter(function(x){return String(x.id)===String(id);})[0];
+      if(a) freigeben(ku,a,b);
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("button.vw-del"),function(b){
+    b.onclick=function(){
+      var id=b.getAttribute("data-id"), slug=b.getAttribute("data-slug");
+      var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+      if(!ku) return;
+      var p=state.per[slug]||{pending:[]};
+      var a=p.pending.filter(function(x){return String(x.id)===String(id);})[0];
+      if(a) verwerfen(ku,a,b);
+    };
+  });
+}
+
+document.addEventListener("click",function(ev){
+  if(!ev.target||!ev.target.closest) return;
+  var el;
+  if(el=ev.target.closest(".obj-load")){
+    var slug=el.getAttribute("data-slug");
+    var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+    if(!ku)return;
+    el.disabled=true; el.textContent="Lade Objekte…";
+    cockpitState(slug).then(function(c){
+      objCache[slug]=c.st;
+      var w=document.getElementById("objwrap-"+slug);
+      if(w){w.setAttribute("data-loaded","1");w.innerHTML=objListeHtml(ku);}
+    })["catch"](function(err){
+      el.disabled=false; el.textContent="\ud83c\udfe0 Objekte anzeigen/verwalten";
+      alert("Objekte konnten nicht geladen werden: "+err.message);
+    });
+    return;
+  }
+  if(el=ev.target.closest(".obj-tgl")){
+    var slug2=el.getAttribute("data-slug"), oid=el.getAttribute("data-oid");
+    var ku2=null; state.kunden.forEach(function(k){if(k.slug===slug2)ku2=k;});
+    var stC=objCache[slug2];
+    if(!ku2||!stC)return;
+    var o=null; stC.objekte.forEach(funct
