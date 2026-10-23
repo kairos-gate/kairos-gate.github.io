@@ -119,4 +119,57 @@ function slugVorschlag(s){
 }
 function nkStep(txt,cls){try{var b=document.getElementById("nk-steps");if(b){b.style.display="block";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=txt;b.appendChild(d);}}catch(e){}}
 function neuerKunde(f){
-  var btn=document.getElementById("nk-go"); if(btn)
+  var btn=document.getElementById("nk-go"); if(btn){btn.disabled=true;btn.textContent="Lege Kunden an…";}
+  var tpl={}, icons={};
+  var basis="../"; var t=Date.now();
+  nkStep("Vorlage wird geladen…");
+  Promise.all([
+    fetch(basis+"petersen/index.html?t="+t,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("Vorlage index.html nicht erreichbar");return r.text();}),
+    fetch(basis+"petersen/sw.js?t="+t,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("Vorlage sw.js nicht erreichbar");return r.text();}),
+    fetch(basis+"petersen/manifest.webmanifest?t="+t,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("Vorlage manifest nicht erreichbar");return r.text();}),
+    fetch(basis+"petersen/icon-192.png?t="+t,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("Icon 192 nicht erreichbar");return r.arrayBuffer();}),
+    fetch(basis+"petersen/icon-512.png?t="+t,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("Icon 512 nicht erreichbar");return r.arrayBuffer();})
+  ]).then(function(res){
+    nkStep("Vorlage geladen","ok");
+    tpl.html=res[0]; tpl.sw=res[1]; tpl.mf=res[2]; icons.i192=bufToB64(res[3]); icons.i512=bufToB64(res[4]);
+    /* Zugang in der Datenbank anlegen (Code wird dort nur als Hash gespeichert) */
+    return rpc("admin_kunde_setzen",{p_admin_code:adminCode,p_slug:f.slug,p_name:f.name,p_code:f.code}).then(function(d){
+      if(!d||d.ok!==true) throw new Error(d&&d.grund==="code"?"Admin-Code nicht mehr g\u00fcltig \u2014 bitte neu anmelden":"Datenbank-Zugang konnte nicht angelegt werden");
+      nkStep("Zugang in der Datenbank angelegt \u2713","ok");
+    });
+  }).then(function(){
+    /* Cockpit aus Vorlage bauen (ohne Code im Seiten-Quelltext!) */
+    var st={savedAt:Date.now(),settings:{abo:f.abo,limit:(ABOS[f.abo]||ABOS.starter).limit,brand:"Anfragen-Assistent",kunde:f.name,minProAnfrage:3},
+      objekte:[{id:"o1",name:f.objekt,miete:f.miete,moebl:"",ab:"",dauer:f.dauer||"",refImmowelt:f.iw||"",refScout:f.scout||"",krit:f.krit||"",status:"aktiv"}]};
+    var html=tpl.html.replace(/(<script type="application\/json" id="state">\n)[\s\S]*?(\n<\/script>)/,function(m,a,b){return a+JSON.stringify(st)+b;});
+    html=html.split('SLUG="petersen"').join('SLUG="'+f.slug+'"');
+    html=html.replace(/<title>[^<]*<\/title>/,"<title>Makler-Cockpit \u00b7 "+f.name+"</title>");
+    var sw=tpl.sw.split("cockpit-petersen-v1").join("cockpit-"+f.slug+"-v1");
+    var mf; try{mf=JSON.parse(tpl.mf);}catch(e){mf={start_url:"./",scope:"./",display:"standalone",background_color:"#F5F0E6",theme_color:"#0C5F45",icons:[{src:"icon-192.png",sizes:"192x192",type:"image/png"},{src:"icon-512.png",sizes:"512x512",type:"image/png","purpose":"any maskable"}]};}
+    mf.name="Cockpit "+f.name; mf.short_name=f.slug.charAt(0).toUpperCase()+f.slug.slice(1);
+    var msg="Neuer Kunde "+f.slug;
+    var dateien=[
+      [f.slug+"/index.html",b64utf8(html),"Cockpit-Seite"],
+      [f.slug+"/manifest.webmanifest",b64utf8(JSON.stringify(mf,null,2)),"App-Manifest"],
+      [f.slug+"/sw.js",b64utf8(sw),"Service Worker"],
+      [f.slug+"/icon-192.png",icons.i192,"Icon klein"],
+      [f.slug+"/icon-512.png",icons.i512,"Icon gro\u00df"]
+    ];
+    var kette=Promise.resolve();
+    dateien.forEach(function(d){
+      kette=kette.then(function(){return ghPut(d[0],d[1],msg+": "+d[2]);}).then(function(){nkStep(d[2]+" \u2713","ok");});
+    });
+    return kette;
+  }).then(function(){
+    /* Kundenliste ergaenzen */
+    return ghGet("freigabe/kunden.json").then(function(ex){
+      var liste={kunden:[]};
+      if(ex&&ex.content){try{liste=JSON.parse(utf8b64(ex.content));}catch(e){}}
+      if(!liste.kunden)liste.kunden=[];
+      liste.kunden=liste.kunden.filter(function(k){return k.slug!==f.slug;});
+      var eintrag={slug:f.slug,name:f.name,objekt:f.objekt,abo:f.abo};
+      var idxU=-1; liste.kunden.forEach(function(k,i){if(k.slug==="unklar")idxU=i;});
+      if(idxU>=0){liste.kunden.splice(idxU,0,eintrag);}else{liste.kunden.push(eintrag);}
+      var body={message:"Neuer Kunde "+f.slug+": Kundenliste",content:b64utf8(JSON.stringify(liste,null,1))};
+      if(ex&&ex.sha)body.sha=ex.sha;
+      return fetch(GH_API+"freigabe/kunden.json",{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("GitHub-Fehler "+r.status+" bei der Kunden
