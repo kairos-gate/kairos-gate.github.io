@@ -293,4 +293,90 @@ function kundeLoeschen(ku,btn){
   if(!confirm("Kunde \u201e"+ku.name+"\u201c wirklich endg\u00fcltig l\u00f6schen?\n\nDas Cockpit und ALLE zugeh\u00f6rigen Anfragen werden aus dem System entfernt. Das kann nicht r\u00fcckg\u00e4ngig gemacht werden."))return;
   var tippe=prompt("Zur Best\u00e4tigung bitte die Kennung des Kunden eintippen:");
   if(tippe===null)return;
-  if(String(tippe).trim().toLowerCase()!==ku.slug){alert("Das war nicht die Kennung \u201e"+ku.slug+"\u201c \u2014 es wurde nichts gel\u
+  if(String(tippe).trim().toLowerCase()!==ku.slug){alert("Das war nicht die Kennung \u201e"+ku.slug+"\u201c \u2014 es wurde nichts gel\u00f6scht.");return;}
+  if(btn){btn.disabled=true;btn.textContent="L\u00f6sche\u2026";}
+  vwStep(ku.slug,"Datenbank-Eintr\u00e4ge werden gel\u00f6scht\u2026");
+  rpc("admin_kunde_loeschen",{p_admin_code:adminCode,p_slug:ku.slug}).then(function(d){
+    if(d&&d.grund==="code") throw new Error("Admin-Code nicht mehr g\u00fcltig \u2014 bitte neu anmelden");
+    if(d&&d.grund==="geschuetzt") throw new Error("Dieser Kunde ist gesch\u00fctzt");
+    vwStep(ku.slug,"Datenbank bereinigt \u2713 (Zugang + alle Anfragen)","ok");
+    vwStep(ku.slug,"Dateien werden ermittelt\u2026");
+    return ghGet(ku.slug);
+  }).then(function(liste){
+    if(!liste||!liste.length) return [];
+    return liste;
+  }).then(function(dateien){
+    var kette=Promise.resolve();
+    dateien.forEach(function(d){
+      kette=kette.then(function(){
+        return fetch(GH_API+d.path,{method:"DELETE",headers:ghHeaders(),body:JSON.stringify({message:"Kunde "+ku.slug+" gel\u00f6scht: "+d.name,sha:d.sha})}).then(function(r){if(!r.ok)throw new Error("GitHub-Fehler "+r.status+" beim L\u00f6schen von "+d.name);});
+      }).then(function(){vwStep(ku.slug,d.name+" entfernt \u2713","ok");});
+    });
+    return kette;
+  }).then(function(){
+    return kundenlisteSchreiben(function(liste){
+      liste.kunden=liste.kunden.filter(function(k){return k.slug!==ku.slug;});
+      return liste;
+    },"Kunde "+ku.slug+" aus Kundenliste entfernt");
+  }).then(function(){
+    state.kunden=state.kunden.filter(function(k){return k.slug!==ku.slug;});
+    for(var i=nkNeu.length-1;i>=0;i--){if(nkNeu[i].slug===ku.slug)nkNeu.splice(i,1);}
+    try{delete state.per[ku.slug];}catch(e){}
+    alert("Kunde \u201e"+ku.name+"\u201c wurde gel\u00f6scht.\n\nLetzter Schritt: Sag Claude im Chat \u201eKunde "+ku.name+" ist gel\u00f6scht\u201c, damit die KI-Zuordnung ihn vergisst.");
+    render();
+  })["catch"](function(err){
+    vwStep(ku.slug,"Abbruch: "+err.message,"err");
+    vwStep(ku.slug,"Du kannst es einfach nochmal versuchen \u2014 bereits Gel\u00f6schtes bleibt gel\u00f6scht, der Rest wird erneut angegangen.");
+    if(btn){btn.disabled=false;btn.textContent="Kunde endg\u00fcltig l\u00f6schen";}
+  });
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function jget(url){return fetch(url,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});}
+
+function load(){
+  state.loading=true; render();
+  var t=Date.now();
+  Promise.all([
+    jget(RAW+"freigabe/kunden.json?t="+t),
+    rpc("admin_anfragen",{p_admin_code:adminCode})["catch"](function(){return null;})
+  ]).then(function(res){
+    var k=res[0], d=res[1];
+    if(k&&k.kunden&&k.kunden.length){state.kunden=k.kunden;}
+    nkNeu.forEach(function(e){
+      var da=false; state.kunden.forEach(function(x){if(x.slug===e.slug)da=true;});
+      if(da)return;
+      var iU=-1; state.kunden.forEach(function(x,i){if(x.slug==="unklar")iU=i;});
+      if(iU>=0){state.kunden.splice(iU,0,e);}else{state.kunden.push(e);}
+    });
+    state.per={};
+    state.kunden.forEach(function(ku){state.per[ku.slug]={pending:[],live:[]};});
+    if(d&&d.ok===true){
+      state.dbOk=true;
+      (d.anfragen||[]).forEach(function(a){
+        if(!a||!a.id||!a.slug)return;
+        if(!state.per[a.slug])state.per[a.slug]={pending:[],live:[]};
+        state.per[a.slug].pending.push(a);
+      });
+      (d.freigegeben||[]).forEach(function(x){
+        if(!x||!x.slug)return;
+        if(!state.per[x.slug])state.per[x.slug]={pending:[],live:[]};
+        state.per[x.slug].live.push(String(x.id));
+      });
+    } else {
+      state.dbOk=false;
+      if(d&&d.grund==="code"){state.authed=false; adminCode=""; try{localStorage.removeItem("z4-admin");}catch(e){}}
+    }
+  }).then(function(){state.loading=false;render();});
+}
+
+function statusOf(ku,a){
+  var p=state.per[ku.slug]||{live:[]};
+  if(p.live.indexOf(String(a.id))>=0) return "live";
+  return "open";
+}
+
+function freigeben(ku,a,btn){
+  btn.disabled=true; btn.textContent="Wird freigegeben…";
+  rpc("admin_freigeben",{p_admin_code:adminCode,p_id:String(a.id),p_patch:{}}).then(function(d){
+    if(!d||d.ok!==true) throw new Error(d&&d.grund==="code"?"Admin-Code nicht mehr gültig":"Freigabe fehlgeschlagen");
+    var p=state.per[ku.slu
