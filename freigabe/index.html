@@ -62,4 +62,61 @@ ol.note li{margin:6px 0}
 .nkform{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}
 .nkform label{font-size:.73rem;font-weight:700;color:var(--muted);margin-bottom:-4px}
 .nkrow2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.n
+.nkrow2>div{display:flex;flex-direction:column}
+.nkrow2>div>:last-child{margin-top:auto}
+.steps{font-size:.82rem;line-height:1.8;background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:10px;display:none}
+.steps .ok{color:var(--green);font-weight:600}
+.steps .err{color:var(--c);font-weight:600}
+.result-ok{background:#EAF3EE;border:1px solid #CBE2D5;border-radius:10px;padding:12px 14px;font-size:.85rem;margin-top:10px;line-height:1.6}
+.danger{background:#A8463A;color:#fff;font-weight:700;width:100%}
+.vwrow{display:flex;gap:8px;margin-top:8px}
+.vwrow .go,.vwrow .danger{flex:1;font-size:.85rem;padding:10px 12px;border-radius:10px}
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+<script>
+var SUPA_URL="https://lgnqaazysivdepbsgayt.supabase.co", SUPA_ANON="sb_publishable_jexkPxbb1hCLdyhmkrRrow_WuSMvk46";
+var RAW="https://raw.githubusercontent.com/kairos-gate/kairos-gate.github.io/main/";
+var PAGES="https://kairos-gate.github.io/";
+var DEFAULT_KUNDEN=[{"slug":"winkler","name":"Frau Winkler","objekt":"Privatstrasse Am Rothenbaum · 2-Zi möbliert"}];
+var state={authed:false,kunden:DEFAULT_KUNDEN.slice(),per:{},loading:true};
+var adminCode="";
+try{adminCode=localStorage.getItem("z4-admin")||"";}catch(e){}
+function rpc(fn,args){
+  if(!SUPA_URL) return Promise.reject(new Error("Datenbank noch nicht verbunden"));
+  var H={"Content-Type":"application/json","apikey":SUPA_ANON};
+  if(SUPA_ANON.indexOf("eyJ")===0){H["Authorization"]="Bearer "+SUPA_ANON;}
+  return fetch(SUPA_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:H,
+    body:JSON.stringify(args)}).then(function(r){return r.json();});
+}
+var GH_API="https://api.github.com/repos/kairos-gate/kairos-gate.github.io/contents/";
+var RESERVIERT=["freigabe","unklar","icons","assets","system","sql"];
+var ABOS={starter:{name:"Starter",limit:1},pro:{name:"Pro",limit:3},premium:{name:"Premium",limit:10}};
+function aboName(a){var x=ABOS[a];return x?x.name:"";}
+function aboOptions(sel){
+  var h=sel?"":'<option value="">— bitte wählen —</option>';
+  Object.keys(ABOS).forEach(function(k){
+    h+='<option value="'+k+'"'+(sel===k?" selected":"")+'>'+ABOS[k].name+' — bis '+ABOS[k].limit+' Objekt'+(ABOS[k].limit>1?"e":"")+'</option>';
+  });
+  return h;
+}
+var nkNeu=[];
+function ghTokenGet(){try{return localStorage.getItem("gh-token")||"";}catch(e){return "";}}
+function ghTokenSet(v){try{if(v){localStorage.setItem("gh-token",v);}else{localStorage.removeItem("gh-token");}}catch(e){}}
+function b64utf8(s){return btoa(unescape(encodeURIComponent(s)));}
+function utf8b64(b){return decodeURIComponent(escape(atob(String(b).replace(/\n/g,""))));}
+function bufToB64(buf){var bin="",u=new Uint8Array(buf);for(var i=0;i<u.length;i++){bin+=String.fromCharCode(u[i]);}return btoa(bin);}
+function ghHeaders(){return {"Authorization":"Bearer "+ghTokenGet(),"Accept":"application/vnd.github+json"};}
+function ghGet(path){return fetch(GH_API+path+"?t="+Date.now(),{headers:ghHeaders()}).then(function(r){if(r.status===404)return null;if(!r.ok)throw new Error("GitHub-Fehler "+r.status+" beim Lesen von "+path);return r.json();});}
+function ghPut(path,b64,msg){return ghGet(path).then(function(ex){var body={message:msg,content:b64};if(ex&&ex.sha)body.sha=ex.sha;return fetch(GH_API+path,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)});}).then(function(r){if(!r.ok)return r.json()["catch"](function(){return{};}).then(function(j){throw new Error("GitHub-Fehler "+r.status+" bei "+path+(j&&j.message?" ("+j.message+")":""));});return r.json();});}
+function clean(s){return String(s).replace(/[\u201e\u201c\u201d\u2018\u2019\u00ab\u00bb"']/g,"").replace(/\s+/g," ").trim();}
+function slugVorschlag(s){
+  s=String(s).toLowerCase().replace(/\b(frau|herr|herrn|familie|firma|immobilien|gmbh|gbr|kg|ag|ug|makler)\b/g," ").trim();
+  var w=s.split(/\s+/).filter(function(x){return x;});
+  if(w.length)s=w[w.length-1];
+  return s.replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]+/g,"").slice(0,20);
+}
+function nkStep(txt,cls){try{var b=document.getElementById("nk-steps");if(b){b.style.display="block";var d=document.createElement("div");if(cls)d.className=cls;d.textContent=txt;b.appendChild(d);}}catch(e){}}
+function neuerKunde(f){
+  var btn=document.getElementById("nk-go"); if(btn)
