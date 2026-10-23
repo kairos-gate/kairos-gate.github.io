@@ -238,4 +238,59 @@ function objListeHtml(ku){
       +'</div>';
   });
   if(akt<lim){
-    h+='<details style="border:0"><summary>\uff0b Objekt hinzuf\u00fcg
+    h+='<details style="border:0"><summary>\uff0b Objekt hinzuf\u00fcgen</summary><div class="nkform">'
+      +'<label>Objekt-Bezeichnung</label><input id="oa-name-'+esc(ku.slug)+'" placeholder="z. B. Isestra\u00dfe 21 \u00b7 3-Zi Altbau">'
+      +'<div class="nkrow2"><div><label>Kaltmiete in \u20ac</label><input id="oa-miete-'+esc(ku.slug)+'" inputmode="numeric" placeholder="1700"></div>'
+      +'<div><label>Mindestmietdauer</label><input id="oa-dauer-'+esc(ku.slug)+'" placeholder="z. B. min. 12 Monate"></div></div>'
+      +'<div class="nkrow2"><div><label>ImmoScout Scout-ID (optional)</label><input id="oa-scout-'+esc(ku.slug)+'" placeholder="170398082"></div>'
+      +'<div><label>Immowelt-Nummer (optional)</label><input id="oa-iw-'+esc(ku.slug)+'" placeholder="3513-04"></div></div>'
+      +'<label>Kriterien f\u00fcr Top-Kandidaten (optional)</label><input id="oa-krit-'+esc(ku.slug)+'" placeholder="z. B. max. 2 Personen">'
+      +'<button class="go obj-add" data-slug="'+esc(ku.slug)+'">Objekt anlegen</button>'
+      +'</div></details>';
+  } else {
+    h+='<p class="note">Objekt-Limit des Pakets erreicht \u2014 f\u00fcr mehr Objekte oben das Abo-Paket erh\u00f6hen.</p>';
+  }
+  return h;
+}
+function kundenlisteSchreiben(aender,msg){
+  return ghGet("freigabe/kunden.json").then(function(ex){
+    var liste={kunden:[]};
+    if(ex&&ex.content){try{liste=JSON.parse(utf8b64(ex.content));}catch(e){}}
+    if(!liste.kunden)liste.kunden=[];
+    liste=aender(liste);
+    var body={message:msg,content:b64utf8(JSON.stringify(liste,null,1))};
+    if(ex&&ex.sha)body.sha=ex.sha;
+    return fetch(GH_API+"freigabe/kunden.json",{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error("GitHub-Fehler "+r.status+" bei der Kundenliste");});
+  });
+}
+function kundeSpeichern(ku,f,btn){
+  if(btn){btn.disabled=true;btn.textContent="Speichere\u2026";}
+  vwStep(ku.slug,"Zugangsdaten werden gespeichert\u2026");
+  rpc("admin_kunde_setzen",{p_admin_code:adminCode,p_slug:ku.slug,p_name:f.name,p_code:f.code||""}).then(function(d){
+    if(!d||d.ok!==true) throw new Error(d&&d.grund==="code"?"Admin-Code nicht mehr g\u00fcltig \u2014 bitte neu anmelden":"Zugangsdaten konnten nicht gespeichert werden");
+    vwStep(ku.slug,"Zugangsdaten gespeichert \u2713"+(f.code?" (neuer Code aktiv)":""),"ok");
+    vwStep(ku.slug,"Cockpit wird angepasst\u2026");
+    return patchCockpit(ku.slug,f.name,f.objekt,f.abo);
+  }).then(function(){
+    vwStep(ku.slug,"Cockpit angepasst \u2713","ok");
+    return kundenlisteSchreiben(function(liste){
+      liste.kunden.forEach(function(k){if(k.slug===ku.slug){k.name=f.name;k.objekt=f.objekt;if(f.abo)k.abo=f.abo;if(k.code!==undefined)delete k.code;}});
+      return liste;
+    },"Kunde "+ku.slug+": Kundenliste aktualisiert");
+  }).then(function(){
+    vwStep(ku.slug,"Kundenliste aktualisiert \u2713","ok");
+    ku.name=f.name;ku.objekt=f.objekt;if(f.abo)ku.abo=f.abo;
+    nkNeu.forEach(function(e){if(e.slug===ku.slug){e.name=f.name;e.objekt=f.objekt;if(f.abo)e.abo=f.abo;}});
+    if(objCache[ku.slug]&&f.abo&&ABOS[f.abo]){objCache[ku.slug].settings.abo=f.abo;objCache[ku.slug].settings.limit=ABOS[f.abo].limit;}
+    try{var sb2=document.getElementById("vw-steps-"+ku.slug);if(sb2){sb2.style.display="block";var d2=document.createElement("div");d2.className="result-ok";d2.innerHTML="\u2705 <b>Gespeichert!</b>"+(f.code?" Der neue Zugangscode gilt ab sofort \u2014 der alte ist ung\u00fcltig.":"")+"<br><b>Letzter Schritt:</b> Sag Claude im Chat \u201eKunde "+esc(f.name)+" wurde ge\u00e4ndert\u201c, damit die KI-Zuordnung die neuen Daten kennt.";sb2.appendChild(d2);}}catch(e){}
+    if(btn){btn.disabled=false;btn.textContent="Gespeichert \u2713";}
+  })["catch"](function(err){
+    vwStep(ku.slug,"Abbruch: "+err.message,"err");
+    if(btn){btn.disabled=false;btn.textContent="Speichern";}
+  });
+}
+function kundeLoeschen(ku,btn){
+  if(!confirm("Kunde \u201e"+ku.name+"\u201c wirklich endg\u00fcltig l\u00f6schen?\n\nDas Cockpit und ALLE zugeh\u00f6rigen Anfragen werden aus dem System entfernt. Das kann nicht r\u00fcckg\u00e4ngig gemacht werden."))return;
+  var tippe=prompt("Zur Best\u00e4tigung bitte die Kennung des Kunden eintippen:");
+  if(tippe===null)return;
+  if(String(tippe).trim().toLowerCase()!==ku.slug){alert("Das war nicht die Kennung \u201e"+ku.slug+"\u201c \u2014 es wurde nichts gel\u
