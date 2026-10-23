@@ -505,4 +505,75 @@ function render(){
   var open=[],done=[],openCnt=0;
   state.kunden.forEach(function(ku){
     var p=state.per[ku.slug]||{pending:[]};
-   
+    p.pending.forEach(function(a){
+      var st=statusOf(ku,a);
+      if(st==="live"){ done.push({ku:ku,a:a,st:st}); }
+      else{ if(st==="open")openCnt++; open.push({ku:ku,a:a,st:st}); }
+    });
+  });
+  open.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
+  done.sort(function(x,y){return Number(y.a.id)-Number(x.a.id);});
+
+  h+='<p class="sect">Zu entscheiden ('+openCnt+')</p>';
+  if(!open.length){ h+='<div class="empty">Nichts offen — alles entschieden.<br>Neue eingestufte Anfragen erscheinen hier automatisch.</div>'; }
+  open.forEach(function(x){ h+=cardHtml(x.ku,x.a,x.st); });
+
+  if(done.length){
+    h+='<details style="border:0;margin-top:18px"><summary>Erledigt ('+done.length+')</summary>';
+    done.forEach(function(x){ h+=cardHtml(x.ku,x.a,x.st); });
+    h+='</details>';
+  }
+  h+='<div class="card" style="margin-top:22px"><details><summary>⚙️ Einrichtung</summary>'
+    +'<p class="note"><b>GitHub-Schl\u00fcssel</b> \u2014 n\u00f6tig, damit die Zentrale Kunden-Seiten anlegen und verwalten kann ('+(ghTokenGet()?'hinterlegt \u2713':'noch nicht hinterlegt')+'). Er wird nur auf diesem Ger\u00e4t gespeichert.</p>'
+    +'<input id="ghtok" type="password" placeholder="github_pat_\u2026" value="'+esc(ghTokenGet())+'">'
+    +'<p></p><button class="go" id="ghtoksave">Schl\u00fcssel speichern</button>'
+    +'<p class="note" style="margin-top:18px"><b>Zentrale-Zugangscode \u00e4ndern</b> \u2014 der Code, mit dem du dich hier anmeldest (mind. 8 Zeichen). Er wird verschl\u00fcsselt gespeichert und nirgends angezeigt \u2014 ein leeres Feld ist hier normal. Zum \u00c4ndern einfach den neuen Code eintragen.</p>'
+    +'<input id="admneu" type="password" placeholder="neuer Zugangscode (mind. 8 Zeichen)" autocomplete="new-password">'
+    +'<p></p><button class="go" id="admsave">Zugangscode \u00e4ndern</button>'
+    +'<div id="admstat" class="note" style="font-weight:600;min-height:1.2em"></div></details></div>';
+  h+='<p class="note" style="text-align:center;margin-top:26px">Kairos Zentrale · Version 4.0 · Anfragedaten liegen zugriffsgesch\u00fctzt in der EU-Datenbank</p>';
+  el.innerHTML=h; bind();
+}
+
+function bind(){
+  var r=document.getElementById("reload"); if(r) r.onclick=load;
+  var adm=document.getElementById("admsave");
+  if(adm) adm.onclick=function(){
+    var inp=document.getElementById("admneu");
+    var st=document.getElementById("admstat");
+    function sag(t,gut){if(st){st.textContent=t;st.style.color=gut?"var(--green)":"var(--c)";}}
+    var v=inp?inp.value.trim():"";
+    if(v.length<8){sag("Der neue Zugangscode braucht mindestens 8 Zeichen.",false);return;}
+    adm.disabled=true; adm.textContent="Ändere…"; sag("",true);
+    rpc("admin_code_aendern",{p_admin_code:adminCode,p_neu:v}).then(function(d){
+      adm.disabled=false; adm.textContent="Zugangscode ändern";
+      if(d&&d.ok===true){
+        adminCode=v; try{localStorage.setItem("z4-admin",v);}catch(e){}
+        if(inp)inp.value="";
+        sag("✓ Neuer Code gespeichert — er gilt ab sofort. (Er wird aus Sicherheitsgründen nicht angezeigt.)",true);
+      } else if(d&&d.grund==="gesperrt"){
+        sag("Zu viele Fehlversuche — bitte in 15 Minuten erneut versuchen.",false);
+      } else if(d&&d.grund==="zu_kurz"){
+        sag("Der neue Code ist zu kurz (mind. 8 Zeichen).",false);
+      } else {
+        sag("Code konnte nicht geändert werden — bitte Seite neu laden und erneut anmelden.",false);
+      }
+    })["catch"](function(err){
+      adm.disabled=false; adm.textContent="Zugangscode ändern";
+      sag("Netzwerkfehler — bitte erneut versuchen.",false);
+    });
+  };
+  var gt=document.getElementById("ghtoksave");
+  if(gt) gt.onclick=function(){
+    var inp=document.getElementById("ghtok");
+    var v=inp?inp.value.trim():"";
+    if(v&&v.indexOf("github_pat_")!==0&&v.indexOf("ghp_")!==0){alert("Das sieht nicht nach einem GitHub-Schl\u00fcssel aus (beginnt mit github_pat_).");return;}
+    ghTokenSet(v);
+    alert(v?"Schl\u00fcssel gespeichert \u2713":"Schl\u00fcssel entfernt.");
+    render();
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("button.edit-save"),function(b){
+    b.onclick=function(){
+      var slug=b.getAttribute("data-slug");
+      var ku=null; state.kunden.forEach(function(k){if(k.slug===slug)ku=k;});
+      if(!ku)retur
