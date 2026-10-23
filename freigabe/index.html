@@ -711,4 +711,44 @@ document.addEventListener("click",function(ev){
       if(w)w.innerHTML=objListeHtml(ku3);
       alert("Objekt angelegt \u2713\n\nLetzter Schritt: Sag Claude im Chat \u201eNeues Objekt bei "+ku3.name+": "+f3.name+"\u201c \u2014 dann ordnet die KI eingehende Anfragen auch diesem Objekt zu.");
     })["catch"](function(err){
-      el.disabled=false; el.textCo
+      el.disabled=false; el.textContent="Objekt anlegen";
+      alert("Abbruch: "+err.message+" \u2014 du kannst es einfach nochmal versuchen.");
+    });
+    return;
+  }
+});
+
+function tryGate(){
+  var v=document.getElementById("gc").value.trim();
+  var ge=document.getElementById("gerr");
+  var gb=document.getElementById("gbtn");
+  if(!v){ge.textContent="Bitte Zugangscode eingeben.";return;}
+  if(gb){gb.disabled=true;gb.textContent="Prüfe…";}
+  rpc("admin_anfragen",{p_admin_code:v}).then(function(d){
+    if(d&&d.ok===true){
+      adminCode=v; state.authed=true;
+      try{localStorage.setItem("z4-admin",v);}catch(e){}
+      load();
+    } else {
+      ge.textContent="Code nicht korrekt — bitte erneut versuchen.";
+      if(gb){gb.disabled=false;gb.textContent="Öffnen";}
+    }
+  })["catch"](function(err){
+    ge.textContent=(String(err&&err.message).indexOf("verbunden")>=0)?"Die Datenbank ist noch nicht verbunden — das richtet Claude gerade ein.":"Keine Verbindung — bitte Internet prüfen und erneut versuchen.";
+    if(gb){gb.disabled=false;gb.textContent="Öffnen";}
+  });
+}
+
+if(adminCode){state.authed=true; load();} else {render();}
+setInterval(function(){
+  if(!state.authed||state.loading) return;
+  var ae=document.activeElement;
+  if(ae&&ae.closest&&(ae.closest(".nkform")||ae.id==="ghtok"||ae.id==="admneu")) return;
+  if(document.querySelector("details[open]")) return;
+  if(document.querySelector(".objwrap[data-loaded]")) return;
+  if(document.getElementById("nk-steps")&&document.getElementById("nk-steps").style.display==="block") return;
+  load();
+},120000);
+</script>
+</body>
+</html>
